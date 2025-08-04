@@ -115,9 +115,6 @@ ignore = [
 extend = "etc/lint/ruff.toml"
 
 [tool.ruff.lint.isort]
-known-first-party = [
-  "kain"
-]
 section-order = [
   "future",
   "standard-library",
@@ -169,9 +166,3 @@ quote_representation = '"'
 section_whitelines = 2
 sequence_style = "block_style"
 whitelines = 0
-
-# [[tool.uv.index]]
-# allow_insecure_host = "gitlab.my.domain"
-# authenticate = "always"
-# name = "custom"
-# url = "https://gitlab.my.domain/index"
