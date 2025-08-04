@@ -5,6 +5,7 @@ import threading
 import time
 import warnings
 from collections.abc import Callable
+from datetime import datetime
 from logging import getLogger
 from pathlib import Path
 from signal import signal as bind
@@ -126,37 +127,54 @@ def quit_at(*, func=sys.exit, signal=None, errno=137, **kw):
     def handler(*_):
         global NeedRestart  # noqa: PLW0603
         NeedRestart = True
-        logger.warning(f'{signal=} received, mark restart as needed')
+        logger.warning(f'{signal=} received')
 
     if signal:
         bind(signal, handler)
 
     initial_stamp = get_mtime()
 
+    #
+
     def on_change(*, sleep=0.0):
 
         if NeedRestart and signal:
-            logger.warning(f'{signal=} received, quit..')
+            logger.warning(f'stop by {signal=}')
             func(errno)
             return False
 
         try:
             if initial_stamp != (ctime := get_mtime()):
                 file = str(get_selfpath())
+                when = datetime.utcfromtimestamp(ctime)
                 logger.warning(
-                    f'{file=} updated {time.time() - ctime:.2f} seconds ago, quit..'
-                )
+                    f'{file=} updated at {when} '
+                    f'({time.time() - ctime:.2f}s ago), stop')
                 func(errno)
                 return False
 
         except FileNotFoundError:
-            logger.warning(f'{get_selfpath()} not found, quit..')
+            logger.warning(f'{get_selfpath()} removed? stop')
             return False
 
         if sleep := (sleep or kw.get('sleep', 0.0)):
             time.sleep(sleep)
         return True
 
+    #
+
+    def sleep(wait: float=0.0, /, poll=0.0):
+        if not wait:
+            return True
+
+        poll = poll or kw.get('poll', 2.5)
+        deadline = time.time() + wait
+
+        while (solution := on_change()) and time.time() < deadline:
+            time.sleep(poll)
+        return solution
+
+    on_change.sleep = sleep
     return on_change
 
 
