@@ -95,4 +95,10 @@ upgrade:
 	@make freeze
 	@uv pip list
 
+publish:
+	@rm -rf dist/ || true
+	@uv build
+	@uvx uv-publish --repo kain
+	@rm -rf dist/ || true
+
 .DEFAULT_GOAL := format
