@@ -86,7 +86,7 @@ def import_object(path, something=None):
         if something is None:
             msg = (
                 f"{Who.Is(path)} isn't str, but "
-                f"second argument (import path) is None"
+                f'second argument (import path) is None'
             )
             raise TypeError(msg)
         path, something = something, path

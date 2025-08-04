@@ -65,8 +65,8 @@ def extract_wrapped(desc):
 
     raise NotImplementedError(
         f"couldn't extract wrapped function from {Who(desc)}: "
-        f"replace it with @property, @cached_property, @{Who(pin)}, "
-        f"or other descriptor derived from {Who(AbstractProperty)}"
+        f'replace it with @property, @cached_property, @{Who(pin)}, '
+        f'or other descriptor derived from {Who(AbstractProperty)}'
     )
 
 
@@ -86,7 +86,7 @@ def parent_call(func):
 
         except RecursionError as e:
             raise RecursionError(
-                f"{Who(node)}.{func.__name__} call real {Who(func)}, "
+                f'{Who(node)}.{func.__name__} call real {Who(func)}, '
                 f"couldn't reach parent descriptor; "
                 f"maybe {Who(func)} it's mixin of {Who(node)}?"
             ) from e
@@ -284,7 +284,7 @@ class Cached(BaseProperty, CustomCallbackMixin):
         if method := getattr(Is.classOf(self), 'is_actual', None):
             if is_actual:
                 raise TypeError(
-                    f"{Who.Is(self)}.is_actual method ({Who.Cast(method)}) "
+                    f'{Who.Is(self)}.is_actual method ({Who.Cast(method)}) '
                     f"can't override by is_actual kw: {Who.Cast(is_actual)}"
                 )
             is_actual = method
