@@ -1,0 +1,21 @@
+[env]
+_.python.venv = {path = ".venv", create = true}
+
+[hooks]
+# enter = ["uv sync --all-extras"]
+postinstall = [
+  "cp -n .env.sample .env",
+  "make sync",
+  "uv run pre-commit install --hook-type pre-push --config etc/pre-commit.yaml"
+]
+
+[settings]
+env_file = '.env'
+experimental = true
+idiomatic_version_file_enable_tools = ["python"]
+python.compile = false
+python.uv_venv_auto = true
+
+# [tools]
+# ruff = "latest"
+# uv = "latest"

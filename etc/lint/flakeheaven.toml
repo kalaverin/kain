@@ -1,0 +1,36 @@
+[tool.flakeheaven]
+docstring-convention = "google"
+exclude = ["*.rst", ".yamlfix"]
+format = "grouped"
+max_line_length = 89
+show_source = true
+
+[tool.flakeheaven.exceptions."docs/conf.py"]
+flake8-variables-names = [
+  "-VNE003"  # variable names that shadow builtins are not allowed
+]
+
+[tool.flakeheaven.plugins]
+# flake8-annotations = ["+*"]
+# flake8-annotations-complexity = ["+*"]
+# flake8-docstrings = ["+*"]
+dlint = ["+*"]
+flake8-aaa = ["+*"]
+flake8-bugbear = ["+*"]
+flake8-comprehensions = ["+*"]
+flake8-debugger = ["+*"]
+flake8-eradicate = ["+*"]
+flake8-expression-complexity = ["+*"]
+flake8-fixme = ["+*"]
+flake8-mutable = ["+*"]
+flake8-pytest = ["+*"]
+flake8-pytest-style = ["+*"]
+flake8-simplify = ["+*"]
+flake8-typing-imports = ["+*"]
+flake8-use-fstring = ["+*"]
+flake8-variables-names = ["+*"]
+mccabe = ["+*"]
+pep8-naming = ["+*"]
+pycodestyle = ["+*"]
+pyflakes = ["+*"]
+pylint = ["+*"]

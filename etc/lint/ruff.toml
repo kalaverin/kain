@@ -1,0 +1,122 @@
+exclude = [
+  "__pycache__",
+  ".git",
+  "docs/etc.py"
+]
+line-length = 89
+output-format = "full"
+target-version = "py311"
+
+[lint]
+ignore = [
+  "COM812",  # Trailing comma missing
+  "EM101",  # Exception must not use a string literal, assign to variable first
+  "EM102",  # Exception must not use an f-string literal, assign to variable first
+  "FBT001",  # Boolean-typed positional argument in function definition
+  "FBT002",  # Boolean default positional argument in function definition
+  "G004",  # Logging statement uses f-string
+  "PLR2004",  # Magic value used in comparison, consider replacing `201` with a constant variable"
+  "PLR2044",  # Line with empty comment
+  "PYI024",  # Use `typing.NamedTuple` instead of `collections.namedtuple`
+  "RET503",  # Missing explicit `return` at the end of function able to return non-`None` value
+  "RUF100",  # Unused `noqa` directive (non-enabled: `FURB156`)
+  "TRY003",  # Avoid specifying long messages outside the exception class
+  "TRY400"  # Use `logging.exception` instead of `logging.error`
+]
+# ignore_missing_imports = true
+select = [
+  "A",
+  "B",
+  # "D",
+  "E",
+  "F",
+  "G",
+  "I",
+  "N",
+  "Q",
+  "S",
+  "W",
+  "C4",
+  "DJ",
+  "EM",
+  "FA",
+  "PD",
+  "PL",
+  "PT",
+  "TC",
+  "TD",
+  "UP",
+  "AIR",
+  # "ANN",  # annotations needs
+  "ARG",
+  "BLE",
+  "C90",
+  "COM",
+  # "CPY",  # non usable without docstrings
+  # "DOC",  # non usable without docstrings
+  "DTZ",
+  "ERA",
+  "EXE",
+  "FBT",
+  "FIX",
+  "FLY",
+  "ICN",
+  "INP",
+  "INT",
+  "ISC",
+  "LOG",
+  "NPY",
+  "PGH",
+  "PIE",
+  "PTH",
+  "PYI",
+  "RET",
+  "RSE",
+  "RUF",
+  "SIM",
+  "SLF",
+  "T10",
+  "T20",
+  "TID",
+  "TRY",
+  "YTT",
+  "FAST",
+  "FURB",
+  "PERF",
+  "SLOT",
+  "ASYNC"
+]
+unfixable = [
+  "G004",  # Logging statement uses f-string
+  "ERA001",  # Found commented-out code
+  "RUF012"  # loop: linter want this, but after use NOQA mark - fixer remove mark
+]
+
+[lint.flake8-annotations]
+suppress-dummy-args = true
+
+[lint.flake8-pytest-style]
+fixture-parentheses = false
+parametrize-names-type = "csv"
+parametrize-values-type = "tuple"
+
+[lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "single"
+multiline-quotes = "double"
+
+[lint.isort]
+force-to-top = []  # used for override special importers in tests/
+known-first-party = ["kain"]
+relative-imports-order = "closest-to-furthest"
+section-order = [
+  "future",
+  "standard-library",
+  "third-party",
+  "first-party",
+  "local-folder"
+]
+split-on-trailing-comma = true
+
+[lint.mccabe]
+max-complexity = 20
