@@ -48,7 +48,6 @@ linting = [
   "yamllint>=1.37.1"
 ]
 testing = [
-  "async-asgi-testclient>=1.4.11",
   "faker>=37.4.0",
   "pytest-asyncio>=1.0.0",
   "pytest-cov>=6.2.1",
@@ -75,8 +74,8 @@ dependencies = [
 description = "kain"
 name = "kain"
 readme = "README.md"
-requires-python = ">=3.10,<3.12"
-version = "0.1.0"
+requires-python = ">=3.10,<3.13"
+version = "0.1.1"
 
 [project.urls]
 Homepage = "https://kalaver.in"

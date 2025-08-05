@@ -17,6 +17,8 @@ from kain.importer import (
 from kain.internals import (
     Is,
     Who,
+    to_ascii,
+    to_bytes,
     unique,
 )
 from kain.monkey import (
@@ -43,5 +45,7 @@ __all__ = (
     'quit_at',
     'required',
     'sort',
+    'to_ascii',
+    'to_bytes',
     'unique',
 )

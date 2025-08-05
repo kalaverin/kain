@@ -11,7 +11,7 @@ from kain.internals import Who, iter_stack, to_ascii, unique
 
 __all__ = 'add_path', 'optional', 'required'
 
-logger = getLogger.get(__name__)
+logger = getLogger(__name__)
 
 
 IGNORED_OBJECT_FIELDS = {

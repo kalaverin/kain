@@ -355,7 +355,7 @@ Is = namedtuple(
         'Builtin '
         'Class '
         'Primivite '
-        'TTY '
+        'tty '
         'awaitable '
         'builtin '
         'callable '

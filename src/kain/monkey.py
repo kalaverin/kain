@@ -6,7 +6,7 @@ from typing import ClassVar
 from kain.importer import required
 from kain.internals import Is, Who
 
-logger = getLogger.get(__name__)
+logger = getLogger(__name__)
 
 
 class Monkey:
@@ -68,7 +68,7 @@ class Monkey:
 
             local = name or func.__name__
             setattr(node, local, wrapper)
-            logger.verbose(f'{Who(node)}.{local} <- {Who(func, addr=True)}')
+            logger.info(f'{Who(node)}.{local} <- {Who(func, addr=True)}')
             return wrapper
 
         return bind
@@ -89,7 +89,7 @@ class Monkey:
             def wrapper(*args, **kw):
                 return func(wrapped_func, *args, **kw)
 
-            logger.verbose(f'{Who(node)}.{wrapped_name} <- {Who(func, addr=True)}')
+            logger.info(f'{Who(node)}.{wrapped_name} <- {Who(func, addr=True)}')
 
             wrapped = decorator(wrapper) if decorator else wrapper
             cls.patch((node, wrapped_name), wrapped)

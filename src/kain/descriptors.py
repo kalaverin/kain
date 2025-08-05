@@ -237,7 +237,7 @@ class BaseProperty(AbstractProperty):
             return ensure_future(value)
 
         except AttributeError as e:
-            error = AttributeException(str(e).message.rsplit(':', 1)[-1])
+            error = AttributeException(str(e).rsplit(':', 1)[-1])
 
             error.exception = e
             raise error from e
