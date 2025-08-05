@@ -138,7 +138,7 @@ local-project = ["kain"]
 "tests/*" = []
 
 [tool.setuptools]
-packages = []
+packages = ["kain"]
 
 [tool.setuptools.package-dir]
 "" = "src"
