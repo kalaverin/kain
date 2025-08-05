@@ -44,15 +44,15 @@ __all__ = (
 )
 
 
-def class_of(obj):
+def class_of(obj: Any) -> bool:
     return obj if isclass(obj) else type(obj)
 
 
-def is_callable(obj):
+def is_callable(obj: Any) -> bool:
     return isinstance(obj, Callable) or callable(obj)
 
 
-def is_collection(obj):
+def is_collection(obj: Any) -> bool:
     return (
         (
             isinstance(obj, Collection)
@@ -64,33 +64,34 @@ def is_collection(obj):
     )
 
 
-def is_iterable(obj):
+def is_iterable(obj: Any) -> bool:
     return isinstance(obj, Iterable) or hasattr(obj, '__iter__')
 
 
-def is_mapping(obj):
+def is_mapping(obj: Any) -> bool:
     return isinstance(obj, Mapping) or issubclass(class_of(obj), dict)
 
 
-def is_primitive(obj):
+def is_primitive(obj: Any) -> bool:
     return obj is True or obj is False or obj is None or type(obj) in Builtins
 
 
-def is_from_primivite(obj):
+def is_from_primivite(obj: Any) -> bool:
     return bool(obj is None or isinstance(obj, Primitives))
 
 
-def is_from_builtin(obj):
+def is_from_builtin(obj: Any) -> bool:
     return bool(isinstance(obj, Collections) or is_from_primivite(obj))
 
 
-def is_tty():
+def is_tty() -> bool:
     if not getattr(sys, 'frozen', False):  # nuitka compiler checks this
         return all(map(methodcaller('isatty'), (stderr, stdin, stdout)))
+    return False
 
 
 @cache
-def _get_module_path_type(full):
+def _get_module_path_type(full: Any) -> tuple[bool | None, str]:
     dirs = get_paths()
 
     path = str(full)
@@ -121,7 +122,7 @@ def _get_module_path_type(full):
     return None, str(full)
 
 
-def is_internal(x):
+def is_internal(x: Any) -> bool:
     if isbuiltin(x) or isbuiltin(class_of(x)):
         return True
 
@@ -137,7 +138,7 @@ def is_internal(x):
     return False
 
 
-def is_subclass(obj, types):  # noqa: PLR0911
+def is_subclass(obj: Any, types) -> bool:  # noqa: PLR0911
     if types is None:
         return False
 
@@ -169,7 +170,7 @@ def is_subclass(obj, types):  # noqa: PLR0911
     return issubclass(cls, types)
 
 
-def get_module(x):
+def get_module(x: Any):
     if ismodule(x):
         return x
 
@@ -177,13 +178,13 @@ def get_module(x):
         return module
 
 
-def get_module_name(x):
+def get_module_name(x: Any) -> str | None:
     if module := get_module(x):
         with suppress(AttributeError):
             return module.__spec__.name
 
 
-def object_name(obj, full=True):
+def object_name(obj: Any, full=True) -> str:
     def post(x):
         return sub(r'^([\?\.]+)', '', sub('^(__main__|__builtin__|builtins)', '', x))
 
@@ -222,23 +223,23 @@ def object_name(obj, full=True):
     return name if full else name.rsplit('.', 1)[-1]
 
 
-def pretty_module(obj):
+def pretty_module(obj: Any) -> str:
     return Who(obj).rsplit('.', 1)[0]
 
 
-def source_file(something, template=None, **kw):
+def source_file(obj: Any, template=None, **kw) -> str:
     kw.setdefault('exclude_self', False)
     kw.setdefault('exclude_stdlib', False)
 
-    for obj in iter_inheritance(class_of(something), **kw):
+    for child in iter_inheritance(class_of(obj), **kw):
         try:
-            if path := getsourcefile(obj):
+            if path := getsourcefile(child):
                 return (template % path) if template else str(path)
         except TypeError:  # noqa: PERF203
             ...
 
 
-def just_value(obj, /, **kw):
+def just_value(obj: Any, /, **kw) -> str:
     kw.setdefault('addr', False)
 
     name = Who(obj, **kw)
@@ -247,13 +248,13 @@ def just_value(obj, /, **kw):
     return f'({name}){obj}'
 
 
-def who_is(obj, /, **kw):  # noqa: N802
+def who_is(obj: Any, /, **kw) -> str:  # noqa: N802
     kw.setdefault('addr', True)
     return just_value(obj, **kw)
 
 
 @cache
-def is_imported_module(name):
+def is_imported_module(name: str) -> bool:
 
     with suppress(KeyError):
         return bool(modules[name])
@@ -283,7 +284,7 @@ def get_mro(obj, /, **kw):
 #
 
 
-def simple_repr(x):
+def simple_repr(x: Any) -> bool | str | None:
     if (x is None or x is True or x is False) or isinstance(x, str):
         return x
 
@@ -293,7 +294,7 @@ def simple_repr(x):
     return Who.Cast(x)
 
 
-def format_args_and_keywords(*args, **kw):
+def format_args_and_keywords(*args, **kw) -> str:
     def format_args(x):
         return repr(tuple(map(simple_repr, x)))[1:-1].rstrip(',')
 
@@ -315,10 +316,10 @@ def format_args_and_keywords(*args, **kw):
 # public interface, Is/Who
 
 
-def Who(obj, /, full=True, addr=False):  # noqa: N802
+def Who(obj: Any, /, full=True, addr=False) -> str:  # noqa: N802
     key = '__name_full__' if full else '__name_short__'
 
-    def get_name():
+    def get_name() -> str:
         try:
             store = obj.__dict__
             with suppress(KeyError):
@@ -333,9 +334,9 @@ def Who(obj, /, full=True, addr=False):  # noqa: N802
         return name
 
     name = get_name()
-    if addr:
-        name = f'{name}#{id(obj):x}'
-    return name
+    if not addr:
+        return name
+    return f'{name}#{id(obj):x}'
 
 
 Who.Args = format_args_and_keywords
@@ -403,7 +404,7 @@ def iter_stack(*args, **kw):
 
 
 def iter_inheritance(  # noqa: PLR0913
-    obj,
+    obj: Any,
     include=None,
     exclude=None,
     exclude_self=True,
@@ -442,52 +443,60 @@ def iter_inheritance(  # noqa: PLR0913
     yield from order
 
 
-def _get_attribute_from_inheritance(something, name, **kw):
+def _get_attribute_from_inheritance(obj: Any, name: str, **kw) -> tuple[Any, Any]:
 
     index = kw.pop('index', 0)
     kw.setdefault('exclude_self', False)
     kw.setdefault('exclude_stdlib', False)
 
     counter = 0
-    for obj in iter_inheritance(something, **kw):
+    for child in iter_inheritance(obj, **kw):
         try:
-            attr = obj.__dict__[name]
+            attr = child.__dict__[name]
 
         except KeyError:
             continue
 
         if not counter - index:
-            return attr, obj
+            return attr, child
         counter += 1
 
     raise KeyError(name)
 
 
-def get_owner(obj, name, **kw):
+def get_owner(obj: Any, name: str, **kw) -> Any:
     with suppress(KeyError):
         return _get_attribute_from_inheritance(obj, name, **kw)[1]
 
 
-def get_attr(obj, name, default=None, **kw):
+def get_attr(obj: Any, name: str, default: Any = None, **kw) -> Any:
     try:
         return _get_attribute_from_inheritance(obj, name, **kw)[0]
     except KeyError:
         return default
 
 
-def to_bytes(x, charset=None) -> bytes:
-    if not isinstance(x, bytes | str):
-        msg = f'only bytes | str acceptable, not {just_value(x)}'
-        raise TypeError(msg)
-    return x.encode(charset or 'ascii') if isinstance(x, str) else x
-
-
-def to_ascii(x, *args, **kw) -> str:
+def to_ascii(x: str, /, charset: str | None = None) -> str:
     charset = kw.pop('charset', 'ascii')
     if not isinstance(x, bytes | str):
-        msg = f'only bytes | str acceptable, not {just_value(x)}'
-        raise TypeError(msg)
-    return x if isinstance(x, str) else to_bytes(x, *args, **kw).decode(charset)
+        raise TypeError(
+            f'only bytes | str acceptable, not {Who.Cast(x)}')
+
+    if isinstance(x, str):
+        return x
+
+    return to_bytes(x, charset=charset).decode(charset)
+
+
+def to_bytes(x: str, /, charset: str | None = None) -> bytes:
+    if not isinstance(x, bytes | str):
+        raise TypeError(
+            f'only bytes | str acceptable, not {Who.Cast(x)}')
+
+    if not isinstance(x, str):
+        return x
+
+    return x.encode(charset or 'ascii')
 
 
 def unique(iterable, /, key=None, include=None, exclude=None):

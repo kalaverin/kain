@@ -112,11 +112,11 @@ class OnSystemExit(metaclass=Singleton):
 
 
 @cache
-def get_selfpath():
+def get_selfpath() -> Path:
     return Path(sys.argv[0]).resolve()
 
 
-def get_mtime():
+def get_mtime() -> float:
     return get_selfpath().stat().st_mtime
 
 
