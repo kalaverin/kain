@@ -17,10 +17,10 @@ from inspect import (
 )
 from itertools import filterfalse
 from operator import itemgetter, methodcaller
+from sys import modules, stderr, stdin, stdout
 from pathlib import Path
 from platform import architecture
 from re import sub
-from sys import modules, stderr, stdin, stdout
 from sysconfig import get_paths
 from types import FunctionType, LambdaType, UnionType
 from typing import Any, GenericAlias, get_args, get_origin
@@ -84,7 +84,7 @@ def is_from_builtin(obj: Any) -> bool:
     return bool(isinstance(obj, Collections) or is_from_primivite(obj))
 
 
-def is_tty() -> bool:
+def is_interactive() -> bool:
     if not getattr(sys, 'frozen', False):  # nuitka compiler checks this
         return all(map(methodcaller('isatty'), (stderr, stdin, stdout)))
     return False
@@ -376,7 +376,7 @@ Is = namedtuple(
     is_from_builtin,
     isclass,
     is_from_primivite,
-    is_tty,
+    is_interactive(),
     isawaitable,
     isbuiltin,
     is_callable,
