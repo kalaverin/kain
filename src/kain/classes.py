@@ -1,6 +1,6 @@
 from kain.internals import Who
 
-__all__ = 'Nothing', 'Singleton'
+__all__ = 'Missing', 'Nothing', 'Singleton'
 
 
 class Singleton(type):
@@ -14,7 +14,7 @@ class Singleton(type):
         return cls.instance
 
 
-class Missing(metaclass=Singleton):
+class Missing:
 
     def __hash__(self):
         return id(self)
@@ -28,7 +28,5 @@ class Missing(metaclass=Singleton):
     def __repr__(self):
         return f'<{Who.Name(self, addr=True)}>'
 
-
-# This is a singleton, so it's safe to use it as a sentinel
 
 Nothing = Missing()

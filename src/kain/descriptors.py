@@ -2,9 +2,11 @@ from asyncio import ensure_future, iscoroutinefunction
 from contextlib import suppress
 from functools import cached_property, lru_cache, partial, wraps
 from inspect import iscoroutine, isfunction, ismethod
+from logging import getLogger
+from operator import attrgetter
 from time import time
 
-from kain.classes import Nothing
+from kain.classes import Missing
 from kain.internals import (
     Is,
     Who,
@@ -12,7 +14,10 @@ from kain.internals import (
     get_owner,
 )
 
-__all__ = 'cache', 'class_property', 'mixed_property', 'pin'
+__all__ = 'cache', 'class_property', 'mixed_property', 'pin', 'proxy_to'
+
+Nothing = Missing()
+logger = getLogger(__name__)
 
 
 class PropertyError(Exception): ...
@@ -63,11 +68,12 @@ def extract_wrapped(desc):
     if Is.subclass(desc, cached_property):
         return desc.func
 
-    raise NotImplementedError(
+    msg = (
         f"couldn't extract wrapped function from {Who(desc)}: "
-        f'replace it with @property, @cached_property, @{Who(pin)}, '
-        f'or other descriptor derived from {Who(AbstractProperty)}'
+        f"replace it with @property, @cached_property, @{Who(pin)}, "
+        f"or other descriptor derived from {Who(AbstractProperty)}"
     )
+    raise NotImplementedError(msg)
 
 
 def parent_call(func):
@@ -85,11 +91,12 @@ def parent_call(func):
             return func(node, extract_wrapped(desc)(node, *args, **kw), *args, **kw)
 
         except RecursionError as e:
-            raise RecursionError(
-                f'{Who(node)}.{func.__name__} call real {Who(func)}, '
+            msg = (
+                f"{Who(node)}.{func.__name__} call real {Who(func)}, "
                 f"couldn't reach parent descriptor; "
                 f"maybe {Who(func)} it's mixin of {Who(node)}?"
-            ) from e
+            )
+            raise RecursionError(msg) from e
 
     return parent_caller
 
@@ -151,10 +158,12 @@ class CustomCallbackMixin:
     @classmethod
     def ttl(cls, expire: float):
         if not isinstance(expire, float | int):
-            raise TypeError(f'expire must be float or int, not {Who.Cast(expire)}')
+            msg = f'expire must be float or int, not {Who.Cast(expire)}'
+            raise TypeError(msg)
 
         if expire <= 0:
-            raise ValueError(f'expire must be positive number, not {expire!r}')
+            msg = f'expire must be positive number, not {expire!r}'
+            raise ValueError(msg)
 
         def is_actual(self, node, value=Nothing):  # noqa: ARG001
             return (value + expire > time()) if value else time()
@@ -165,10 +174,11 @@ class CustomCallbackMixin:
 class InsteadProperty(AbstractProperty, CustomCallbackMixin):
     def __init__(self, function):
         if iscoroutinefunction(function):
-            raise TypeError(
+            msg = (
                 f'{Who(function)} is coroutine function, '
                 'you must use @pin.native instead of just @pin'
             )
+            raise TypeError(msg)
         super().__init__(function)
 
     @cached_property
@@ -194,7 +204,8 @@ class InsteadProperty(AbstractProperty, CustomCallbackMixin):
         return value
 
     def __delete__(self, node):
-        raise ReadOnlyError(f'{self.header_with_context(node)}: deleter called')
+        msg = f'{self.header_with_context(node)}: deleter called'
+        raise ReadOnlyError(msg)
 
 
 class BaseProperty(AbstractProperty):
@@ -283,10 +294,11 @@ class Cached(BaseProperty, CustomCallbackMixin):
 
         if method := getattr(Is.classOf(self), 'is_actual', None):
             if is_actual:
-                raise TypeError(
-                    f'{Who.Is(self)}.is_actual method ({Who.Cast(method)}) '
+                msg = (
+                    f"{Who.Is(self)}.is_actual method ({Who.Cast(method)}) "
                     f"can't override by is_actual kw: {Who.Cast(is_actual)}"
                 )
+                raise TypeError(msg)
             is_actual = method
         self.is_actual = is_actual
 
@@ -392,3 +404,128 @@ class class_property(ClassProperty): ...  # noqa: N801
 
 
 class mixed_property(MixedProperty): ...  # noqa: N801
+
+
+#
+
+
+def proxy_to(  # noqa: PLR0915
+    *mapping,
+    getter=attrgetter,
+    default=Nothing,
+    pre=None,
+    safe=True,
+):
+    if isinstance(mapping[-1], str):
+        bind = pin
+
+    elif mapping[-1] is None:
+        bind, mapping = None, mapping[:-1]
+
+    else:
+        bind, mapping = mapping[-1], mapping[:-1]
+
+    def class_wraper(cls):  # noqa: PLR0915
+        if not Is.Class(cls):
+            msg = f"{Who.Is(cls)} isn't a class"
+            raise TypeError(msg)
+
+        try:
+            fields = cls.__proxy_fields__
+        except AttributeError:
+            fields = []
+            cls.__proxy_fields__ = fields
+
+        pivot, mapping_list = mapping[0], mapping[1:]
+
+        if not mapping_list or (
+            len(mapping_list) == 1 and not isinstance(mapping_list[0], str)
+        ):
+            raise ValueError(f'empty {mapping_list=} for {pivot=}')
+
+        for method in mapping_list:
+
+            if safe and not method.startswith('_') and get_attr(cls, method):
+                msg = (
+                    f'{Who(cls)} already exists {method!a}: {get_attr(cls, method)}'
+                )
+                raise TypeError(msg)
+
+            def wrapper(name, node):
+                if not isinstance(pivot, str):
+                    try:
+                        return getattr(pivot, name)
+                    except AttributeError as e:
+                        msg = (
+                            f"{Who(node)}.{name} {Who.Name(getter)[:4]}-proxied -> "
+                            f"{Who(pivot)}.{name}, but last isn't exists"
+                        )
+                        raise AttributeError(msg) from e
+
+                try:
+                    entity = getattr(node, pivot)
+                except AttributeError as e:
+                    msg = (
+                        f"{Who(node)}.{name} {Who.Name(getter)[:4]}-proxied -> "
+                        f"{Who(node)}.{pivot}.{name}, but "
+                        f"{Who(node)}.{pivot} isn't exists"
+                    )
+                    raise AttributeError(msg) from e
+
+                if entity is None:
+                    msg = (
+                        f'{Who(node)}.{name} {Who.Name(getter)[:4]}-proxied -> '
+                        f'{Who(node)}.{pivot}.{name}, but current '
+                        f'{Who(node)}.{pivot} is None'
+                    )
+
+                    if default is Nothing:
+                        raise AttributeError(msg)
+
+                    msg = f'{msg}; return {Who.Is(default)}'
+                    logger.warning(msg)
+                    result = default
+
+                else:
+                    try:
+                        result = getter(name)(entity)
+
+                    except (AttributeError, KeyError) as e:
+                        msg = (
+                            f"{Who(node)}.{name} {Who.Name(getter)[:4]}-proxied -> "
+                            f"{Who(node)}.{pivot}.{name}, but isn't exists "
+                            f"('{name}' not in {Who(node)}.{pivot}): "
+                            f"{Who.Is(entity)}"
+                        )
+
+                        if default is Nothing:
+                            raise Is.classOf(e)(msg) from e
+
+                        msg = f'{msg}; return {Who.Is(default)}'
+                        logger.warning(msg)
+                        result = default
+
+                return partial(pre, result) if pre else result
+
+            wrapper.__name__ = method
+            wrapper.__qualname__ = f'{pivot}.{method}'
+
+            if bind is None:
+                node = cls.__dict__[pivot]
+                try:
+                    value = node.__dict__[method]
+                except KeyError:
+                    value = getattr(node, method)
+            else:
+                wrap = partial(wrapper, method)
+                wrap.__name__ = method
+                wrap.__qualname__ = f'{pivot}.{method}'
+                value = bind(wrap)
+
+            fields.append(method)
+            setattr(cls, method, value)
+            cls.__proxy_fields__.sort()
+
+        return cls
+
+    return class_wraper

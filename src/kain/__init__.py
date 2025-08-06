@@ -7,6 +7,7 @@ from kain.descriptors import (
     class_property,
     mixed_property,
     pin,
+    proxy_to,
 )
 from kain.importer import (
     add_path,
@@ -42,6 +43,7 @@ __all__ = (
     'on_quit',
     'optional',
     'pin',
+    'proxy_to',
     'quit_at',
     'required',
     'sort',

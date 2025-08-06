@@ -478,19 +478,18 @@ def get_attr(obj: Any, name: str, default: Any = None, **kw) -> Any:
 
 def to_ascii(x: str, /, charset: str | None = None) -> str:
     if not isinstance(x, bytes | str):
-        raise TypeError(
-            f'only bytes | str acceptable, not {Who.Cast(x)}')
+        raise TypeError(f'only bytes | str acceptable, not {Who.Cast(x)}')
 
     if isinstance(x, str):
         return x
 
-    return to_bytes(x, charset=charset).decode(charset or 'ascii')
+    charset = charset or 'ascii'
+    return to_bytes(x, charset=charset).decode(charset)
 
 
 def to_bytes(x: str, /, charset: str | None = None) -> bytes:
     if not isinstance(x, bytes | str):
-        raise TypeError(
-            f'only bytes | str acceptable, not {Who.Cast(x)}')
+        raise TypeError(f'only bytes | str acceptable, not {Who.Cast(x)}')
 
     if not isinstance(x, str):
         return x

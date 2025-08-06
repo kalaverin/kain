@@ -149,7 +149,8 @@ def quit_at(*, func=sys.exit, signal=None, errno=137, **kw):
                 when = datetime.utcfromtimestamp(ctime)
                 logger.warning(
                     f'{file=} updated at {when} '
-                    f'({time.time() - ctime:.2f}s ago), stop')
+                    f'({time.time() - ctime:.2f}s ago), stop'
+                )
                 func(errno)
                 return False
 
@@ -163,7 +164,7 @@ def quit_at(*, func=sys.exit, signal=None, errno=137, **kw):
 
     #
 
-    def sleep(wait: float=0.0, /, poll=0.0):
+    def sleep(wait: float = 0.0, /, poll=0.0):
         if not wait:
             return True
 
