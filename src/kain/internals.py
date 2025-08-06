@@ -2,6 +2,7 @@ import sys
 from collections import deque, namedtuple
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from contextlib import suppress
+from enum import Flag
 from functools import cache, partial
 from inspect import (
     getmodule,
@@ -17,19 +18,17 @@ from inspect import (
 )
 from itertools import filterfalse
 from operator import itemgetter, methodcaller
-from sys import modules, stderr, stdin, stdout
 from pathlib import Path
 from platform import architecture
 from re import sub
+from sys import modules, stderr, stdin, stdout
 from sysconfig import get_paths
 from types import FunctionType, LambdaType, UnionType
 from typing import Any, GenericAlias, get_args, get_origin
 
-Collections = deque, dict, list, set, tuple, bytearray
-Primitives = bool, float, int, str, complex, bytes
-Builtins = Primitives + Collections
-
-WinNT = 'windows' in architecture()[1].lower()
+Collections = bytearray, deque, dict, list, set, tuple
+Primitives = bool, bytes, complex, float, int, str
+Builtins = Collections + Primitives
 
 __all__ = (
     'Is',
@@ -42,6 +41,17 @@ __all__ = (
     'to_bytes',
     'unique',
 )
+
+PlatformDirectories = get_paths()
+PackagesRoot = Path(__file__).parent.parent
+WinNT = 'windows' in architecture()[1].lower()
+
+
+class PathType(Flag):
+    Standart   = 1 << 0
+    Platform   = 1 << 1
+    ThirdParty = 1 << 2
+    Unknown    = 1 << 3
 
 
 def class_of(obj: Any) -> bool:
@@ -73,7 +83,7 @@ def is_mapping(obj: Any) -> bool:
 
 
 def is_primitive(obj: Any) -> bool:
-    return obj is True or obj is False or obj is None or type(obj) in Builtins
+    return obj is True or obj is False or obj is None or class_of(obj) in Builtins
 
 
 def is_from_primivite(obj: Any) -> bool:
@@ -91,35 +101,52 @@ def is_interactive() -> bool:
 
 
 @cache
-def _get_module_path_type(full: Any) -> tuple[bool | None, str]:
-    dirs = get_paths()
+def __get_module_path_type(path: str) -> tuple[PathType, str]:
 
-    path = str(full)
+    agnostic = path  # platform case sensitivity
     if WinNT:
-        path = path.lower()
+        agnostic = path.lower()
+
+    # check platform directories
 
     for scheme, reason in (
-        ('stdlib', True),
-        ('purelib', False),
-        ('platlib', False),
-        ('platstdlib', True),
+        ('stdlib', PathType.Standart),
+        ('purelib', PathType.Platform),
+        ('platlib', PathType.Platform),
+        ('platstdlib', PathType.Standart),
     ):
-        subdir = dirs[scheme]
+        subdir = PlatformDirectories[scheme]
         if WinNT:
             subdir = subdir.lower()
 
-        if path.startswith(subdir):
-            return reason, str(full)[len(subdir) + 1 :]
+        if agnostic.startswith(subdir):
+            return reason, path[len(subdir) + 1:]
 
-    subdir = str(Path(__file__).parent.parent)
+    # may be it's installed to venv?
 
+    subdir = str(PackagesRoot)
     if WinNT:
         subdir = subdir.lower()
 
-    if path.startswith(subdir):
-        return False, str(full)[len(subdir) + 1 :]
+    if agnostic.startswith(subdir):
+        return PathType.ThirdParty, path[len(subdir) + 1:]
 
-    return None, str(full)
+    return PathType.Unknown, path
+
+
+def _get_module_path_type(path: Path | str) -> tuple[PathType, str]:
+
+    if not isinstance(path, Path | str):
+        raise TypeError(f'only Path | str acceptable, not {Who.Cast(path)}')
+
+    if not isinstance(path, Path):
+        path = Path(path)
+
+    path = path.resolve()
+    if not path.is_file():
+        return PathType.Unknown, str(path)
+
+    return __get_module_path_type(str(path))
 
 
 def is_internal(x: Any) -> bool:
@@ -127,13 +154,12 @@ def is_internal(x: Any) -> bool:
         return True
 
     if module := get_module(x):
-
-        if module.__name__ == 'builtins':
+        if (
+            module.__name__ == 'builtins' or
+            module.__spec__.origin == 'built-in' or
+            _get_module_path_type(module.__spec__.origin)[0] is PathType.Standart
+        ):
             return True
-
-        is_stdlib = _get_module_path_type(module.__file__)[0]
-        if is_stdlib is not None:
-            return is_stdlib
 
     return False
 
@@ -232,11 +258,9 @@ def source_file(obj: Any, template=None, **kw) -> str:
     kw.setdefault('exclude_stdlib', False)
 
     for child in iter_inheritance(class_of(obj), **kw):
-        try:
+        with suppress(TypeError):
             if path := getsourcefile(child):
                 return (template % path) if template else str(path)
-        except TypeError:  # noqa: PERF203
-            ...
 
 
 def just_value(obj: Any, /, **kw) -> str:
@@ -244,7 +268,7 @@ def just_value(obj: Any, /, **kw) -> str:
 
     name = Who(obj, **kw)
     if isclass(obj):
-        return f'({name})'
+        return f'{name}'
     return f'({name}){obj}'
 
 
@@ -313,7 +337,7 @@ def format_args_and_keywords(*args, **kw) -> str:
     return ''
 
 
-# public interface, Is/Who
+# public interface, Who/Is
 
 
 def Who(obj: Any, /, full=True, addr=False) -> str:  # noqa: N802
@@ -340,12 +364,14 @@ def Who(obj: Any, /, full=True, addr=False) -> str:  # noqa: N802
 
 
 Who.Args = format_args_and_keywords
-Who.Cast = just_value
 Who.File = source_file
 Who.Inheritance = get_mro
-Who.Is = who_is
-Who.Module = pretty_module
-Who.Name = partial(Who, full=False)
+
+# Who(module.file.value)               -> module.file.value
+Who.Cast = just_value                # -> (module.file.Value)2
+Who.Is = who_is                      # -> (module.file.Value#1252)2
+Who.Module = pretty_module           # -> module.file
+Who.Name = partial(Who, full=False)  # -> Value
 
 #
 

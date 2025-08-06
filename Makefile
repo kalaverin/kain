@@ -66,8 +66,6 @@ lint:
 format:
 	@uv sync --group linting
 
-	@uv run --quiet black 'src/' 'tests/'
-
 	@uv run --quiet ruff check \
 		--fix \
 		'src/' 'tests/'
