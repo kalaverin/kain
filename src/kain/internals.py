@@ -24,7 +24,7 @@ from re import sub
 from sys import modules, stderr, stdin, stdout
 from sysconfig import get_paths
 from types import FunctionType, LambdaType, UnionType
-from typing import Any, GenericAlias, Type, get_args, get_origin
+from typing import Any, GenericAlias, get_args, get_origin
 
 Collections = deque, dict, list, set, tuple, bytearray
 Primitives = bool, float, int, str, complex, bytes
@@ -346,12 +346,14 @@ class Who:
     Addr: partial[str] = partial(who_is, addr=True)
     Name: partial[str] = partial(who_is, full=False)
 
+
 #
+
 
 @dataclass
 class Is:
     Builtin: Callable[..., bool] = is_from_builtin
-    Class: Callable[..., Type[type[Any]]] = isclass
+    Class: Callable[..., type[type[Any]]] = isclass
 
     Primivite: Callable = is_from_primivite
     tty: bool = is_interactive()

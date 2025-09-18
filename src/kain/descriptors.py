@@ -1,6 +1,6 @@
 from asyncio import ensure_future, iscoroutinefunction
-from contextlib import suppress
 from collections.abc import Callable
+from contextlib import suppress
 from functools import cached_property, lru_cache, partial, wraps
 from inspect import iscoroutine, isfunction, ismethod
 from logging import getLogger
@@ -34,7 +34,7 @@ class ReadOnlyError(PropertyError): ...
 class AttributeException(PropertyError): ...  # noqa: N818
 
 
-def cache(limit: Any=None):
+def cache(limit: Any = None):
 
     function = partial(lru_cache, maxsize=None, typed=False)
 
@@ -282,7 +282,7 @@ class InheritedClass(BaseProperty):
         """Make child-aware class from plain parent-based."""
 
         name: str = Who.Is(parent, full=False)
-        suffix:str = f'{"_" if name == name.lower() else ""}inherited'.capitalize()
+        suffix: str = f'{"_" if name == name.lower() else ""}inherited'.capitalize()
 
         result: type[BaseProperty] = type(f'{name}{suffix}', (cls, parent), {})
         result.here = parent
@@ -448,9 +448,7 @@ def proxy_to(  # noqa: PLR0915
         for method in mapping_list:
 
             if safe and not method.startswith('_') and get_attr(cls, method):
-                msg = (
-                    f'{Who(cls)} already exists {method!a}: {get_attr(cls, method)}'
-                )
+                msg = f'{Who(cls)} already exists {method!a}: {get_attr(cls, method)}'
                 raise TypeError(msg)
 
             def wrapper(name, node):

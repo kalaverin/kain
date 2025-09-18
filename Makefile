@@ -6,8 +6,8 @@ install:
 	@mise trust --yes .mise.toml && mise install
 
 sync:
-	@uv venv --refresh
-	@uv sync
+	@uv venv --clear --refresh
+	@uv sync --refresh
 	@make freeze
 
 freeze:
@@ -18,24 +18,15 @@ freeze:
 		--generate-hashes pyproject.toml \
 		--quiet
 
-lint:
+check:
 	@uv sync --group linting
 
 	@uv run --quiet vulture \
 		--min-confidence 66 \
 		'src/' 'tests/'
 
-	@uv run --quiet black \
-		--check \
-		--diff \
-		'src/' 'tests/'
-
 	@uv run --quiet mypy \
 		--config-file etc/lint/mypy.toml \
-		'src/' 'tests/'
-
-	@uv run --quiet flakeheaven lint \
-		--config etc/lint/flakeheaven.toml \
 		'src/' 'tests/'
 
 	@uv run --quiet ruff check \
@@ -63,7 +54,7 @@ lint:
 		--config-file etc/lint/yamllint.yaml \
 		.
 
-format:
+lint:
 	@uv sync --group linting
 
 	@uv run --quiet black 'src/' 'tests/'
@@ -78,7 +69,6 @@ format:
 
 	@uv run --quiet pre-commit run \
 		--config etc/pre-commit.yaml \
-		--show-diff-on-failure \
 		--color always \
 		--all
 
