@@ -1,10 +1,12 @@
 from asyncio import ensure_future, iscoroutinefunction
 from contextlib import suppress
+from collections.abc import Callable
 from functools import cached_property, lru_cache, partial, wraps
 from inspect import iscoroutine, isfunction, ismethod
 from logging import getLogger
 from operator import attrgetter
 from time import time
+from typing import Any
 
 from kain.classes import Missing
 from kain.internals import (
@@ -32,7 +34,7 @@ class ReadOnlyError(PropertyError): ...
 class AttributeException(PropertyError): ...  # noqa: N818
 
 
-def cache(limit=None):
+def cache(limit: Any=None):
 
     function = partial(lru_cache, maxsize=None, typed=False)
 
@@ -272,24 +274,24 @@ class InheritedClass(BaseProperty):
     """
 
     @invokation_context_check
-    def get_node(self, node):
+    def get_node(self, node: Any) -> Any:
         return node
 
     @classmethod
-    def make_from(cls, parent):
+    def make_from(cls, parent: Any) -> type[BaseProperty]:
         """Make child-aware class from plain parent-based."""
 
-        name = Who(parent, full=False)
-        suffix = f'{"_" if name == name.lower() else ""}inherited'.capitalize()
+        name: str = Who.Is(parent, full=False)
+        suffix:str = f'{"_" if name == name.lower() else ""}inherited'.capitalize()
 
-        result = type(f'{name}{suffix}', (cls, parent), {})
+        result: type[BaseProperty] = type(f'{name}{suffix}', (cls, parent), {})
         result.here = parent
         return result
 
 
 class Cached(BaseProperty, CustomCallbackMixin):
 
-    def __init__(self, function, is_actual=Nothing):
+    def __init__(self, function: Callable, is_actual=Nothing):
         super().__init__(function)
 
         if method := getattr(Is.classOf(self), 'is_actual', None):

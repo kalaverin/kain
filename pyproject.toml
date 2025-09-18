@@ -9,9 +9,7 @@ build = [
   "setuptools"
 ]
 development = [
-  "better-exceptions>=0.3.3",
-  "pre-commit>=4.2.0",
-  "pipdeptree>=2.26.1"
+  "better-exceptions>=0.3.3"
 ]
 documentation = [
   "sphinx>=8.1.3",

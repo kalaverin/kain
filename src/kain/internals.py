@@ -1,7 +1,8 @@
 import sys
-from collections import deque, namedtuple
+from collections import deque
 from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from contextlib import suppress
+from dataclasses import dataclass
 from functools import cache, partial
 from inspect import (
     getmodule,
@@ -17,13 +18,13 @@ from inspect import (
 )
 from itertools import filterfalse
 from operator import itemgetter, methodcaller
-from sys import modules, stderr, stdin, stdout
 from pathlib import Path
 from platform import architecture
 from re import sub
+from sys import modules, stderr, stdin, stdout
 from sysconfig import get_paths
 from types import FunctionType, LambdaType, UnionType
-from typing import Any, GenericAlias, get_args, get_origin
+from typing import Any, GenericAlias, Type, get_args, get_origin
 
 Collections = deque, dict, list, set, tuple, bytearray
 Primitives = bool, float, int, str, complex, bytes
@@ -44,7 +45,7 @@ __all__ = (
 )
 
 
-def class_of(obj: Any) -> bool:
+def class_of(obj: Any) -> type[Any]:
     return obj if isclass(obj) else type(obj)
 
 
@@ -191,18 +192,18 @@ def object_name(obj: Any, full=True) -> str:
     def get_module_from(x):
         return getattr(x, '__module__', get_module_name(x)) or '?'
 
-    def get_object_name(x):
+    def get_object_name(x: Any):
         if obj is Any:
             return 'typing.Any' if full else 'Any'
 
-        name = getattr(x, '__qualname__', x.__name__)
+        name: str = getattr(x, '__qualname__', str(x.__name__))
         module = get_module_from(x)
 
         if not name.startswith(module):
             name = f'{module}.{name}'
         return name
 
-    def main(obj):
+    def main(obj: Any):
         if ismodule(obj):
             return get_module_name(obj)
 
@@ -224,7 +225,7 @@ def object_name(obj: Any, full=True) -> str:
 
 
 def pretty_module(obj: Any) -> str:
-    return Who(obj).rsplit('.', 1)[0]
+    return who_is(obj).rsplit('.', 1)[0]
 
 
 def source_file(obj: Any, template=None, **kw) -> str:
@@ -242,15 +243,10 @@ def source_file(obj: Any, template=None, **kw) -> str:
 def just_value(obj: Any, /, **kw) -> str:
     kw.setdefault('addr', False)
 
-    name = Who(obj, **kw)
+    name = who_is(obj, **kw)
     if isclass(obj):
         return f'({name})'
     return f'({name}){obj}'
-
-
-def who_is(obj: Any, /, **kw) -> str:  # noqa: N802
-    kw.setdefault('addr', True)
-    return just_value(obj, **kw)
 
 
 @cache
@@ -267,18 +263,18 @@ def is_imported_module(name: str) -> bool:
 
 def get_mro(obj, /, **kw):
 
-    func = kw.pop('func', None)
-    glue = kw.pop('glue', None)
+    func: Any = kw.pop('func', None)
+    glue: Any = kw.pop('glue', None)
 
     result = iter_inheritance(obj, **kw)
 
     if func:
-        result = tuple(map(func, result))
+        result: tuple[Any, ...] = tuple(map(func, result))
 
     if glue:
-        result = glue.join(result)
+        return glue.join(result)
 
-    return result if (func or glue) else tuple(result)
+    return result if func else tuple(result)
 
 
 #
@@ -291,7 +287,7 @@ def simple_repr(x: Any) -> bool | str | None:
     if isinstance(x, int | float):
         return repr(x)
 
-    return Who.Cast(x)
+    return just_value(x)
 
 
 def format_args_and_keywords(*args, **kw) -> str:
@@ -316,7 +312,7 @@ def format_args_and_keywords(*args, **kw) -> str:
 # public interface, Is/Who
 
 
-def Who(obj: Any, /, full=True, addr=False) -> str:  # noqa: N802
+def who_is(obj: Any, /, full=True, addr=False) -> str:  # noqa: N802
     key = '__name_full__' if full else '__name_short__'
 
     def get_name() -> str:
@@ -339,60 +335,41 @@ def Who(obj: Any, /, full=True, addr=False) -> str:  # noqa: N802
     return f'{name}#{id(obj):x}'
 
 
-Who.Args = format_args_and_keywords
-Who.Cast = just_value
-Who.File = source_file
-Who.Inheritance = get_mro
-Who.Is = who_is
-Who.Module = pretty_module
-Who.Name = partial(Who, full=False)
+@dataclass
+class Who:
+    Args: Callable[..., str] = format_args_and_keywords
+    Cast: Callable[..., str] = just_value
+    File: Callable[..., str] = source_file
+    Inheritance: Callable[..., Any] = get_mro
+    Is: Callable[..., str] = who_is
+    Module: Callable[..., str] = pretty_module
+    Addr: partial[str] = partial(who_is, addr=True)
+    Name: partial[str] = partial(who_is, full=False)
 
 #
 
-Is = namedtuple(
-    'Is',
-    (
-        'Builtin '
-        'Class '
-        'Primivite '
-        'tty '
-        'awaitable '
-        'builtin '
-        'callable '
-        'classOf '
-        'collection '
-        'coroutine '
-        'function '
-        'imported '
-        'internal '
-        'iterable '
-        'mapping '
-        'method '
-        'module '
-        'primitive '
-        'subclass'
-    ),
-)(
-    is_from_builtin,
-    isclass,
-    is_from_primivite,
-    is_interactive(),
-    isawaitable,
-    isbuiltin,
-    is_callable,
-    class_of,
-    is_collection,
-    iscoroutine,
-    isfunction,
-    is_imported_module,
-    is_internal,
-    is_iterable,
-    is_mapping,
-    ismethod,
-    ismodule,
-    is_primitive,
-    is_subclass,
-)
+@dataclass
+class Is:
+    Builtin: Callable[..., bool] = is_from_builtin
+    Class: Callable[..., Type[type[Any]]] = isclass
+
+    Primivite: Callable = is_from_primivite
+    tty: bool = is_interactive()
+    awaitable: Callable = isawaitable
+    builtin: Callable = isbuiltin
+    callable: Callable = is_callable
+    classOf = class_of
+    collection: Callable = is_collection
+    coroutine: Callable = iscoroutine
+    function: Callable = isfunction
+    imported: Callable = is_imported_module
+    internal: Callable = is_internal
+    iterable: Callable = is_iterable
+    mapping: Callable = is_mapping
+    method: Callable = ismethod
+    module: Callable = ismodule
+    primitive: Callable = is_primitive
+    subclass: Callable = is_subclass
 
 
 # public functions
@@ -478,7 +455,8 @@ def get_attr(obj: Any, name: str, default: Any = None, **kw) -> Any:
 
 def to_ascii(x: str, /, charset: str | None = None) -> str:
     if not isinstance(x, bytes | str):
-        raise TypeError(f'only bytes | str acceptable, not {Who.Cast(x)}')
+        msg = f'only bytes | str acceptable, not {just_value(x)}'
+        raise TypeError(msg)
 
     if isinstance(x, str):
         return x
@@ -489,7 +467,8 @@ def to_ascii(x: str, /, charset: str | None = None) -> str:
 
 def to_bytes(x: str, /, charset: str | None = None) -> bytes:
     if not isinstance(x, bytes | str):
-        raise TypeError(f'only bytes | str acceptable, not {Who.Cast(x)}')
+        msg = f'only bytes | str acceptable, not {just_value(x)}'
+        raise TypeError(msg)
 
     if not isinstance(x, str):
         return x
