@@ -1,0 +1,14 @@
+{
+  "globs": [
+    "**/*.md"
+  ],
+  "ignores": [
+    "**/.*/**"
+  ],
+  "config": {
+    // heading-increment Heading levels should only increment by one level at a time [Expected: h4; Actual: h5]
+    "MD001": false,
+    // line-length Line length [Expected: 80; Actual: 90]
+    "MD013": false
+  }
+}
