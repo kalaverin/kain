@@ -44,7 +44,7 @@ class Monkey:
         if getattr(node, name, None) is new:
             return new
 
-        old = required(node, name) if Who(node, full=False) != name else node
+        old = required(node, name) if Who.Is(node) != name else node
 
         setattr(node, name, new)
         new = getattr(node, name)
@@ -52,7 +52,7 @@ class Monkey:
             raise RuntimeError
 
         cls.mapping[new] = old
-        logger.debug(f'{Who(old, addr=True)} -> {Who(new, addr=True)}')
+        logger.debug(f'{Who.Addr(old)} -> {Who.Addr(new)}')
         return new
 
     @classmethod
@@ -68,7 +68,7 @@ class Monkey:
 
             local = name or func.__name__
             setattr(node, local, wrapper)
-            logger.info(f'{Who(node)}.{local} <- {Who(func, addr=True)}')
+            logger.info(f'{Who.Is(node)}.{local} <- {Who.Addr(func)}')
             return wrapper
 
         return bind
@@ -80,7 +80,7 @@ class Monkey:
         def wrap(func):
 
             wrapped_name = name or func.__name__
-            if Who(node, full=False) != wrapped_name:
+            if Who.Name(node) != wrapped_name:
                 wrapped_func = required(node, wrapped_name)
             else:
                 wrapped_func = node
@@ -89,7 +89,7 @@ class Monkey:
             def wrapper(*args, **kw):
                 return func(wrapped_func, *args, **kw)
 
-            logger.info(f'{Who(node)}.{wrapped_name} <- {Who(func, addr=True)}')
+            logger.info(f'{Who.Is(node)}.{wrapped_name} <- {Who.Addr(func)}')
 
             wrapped = decorator(wrapper) if decorator else wrapper
             cls.patch((node, wrapped_name), wrapped)

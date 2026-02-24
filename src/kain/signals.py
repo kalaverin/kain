@@ -121,7 +121,13 @@ def get_mtime() -> float:
 
 
 @cache
-def quit_at(*, func=sys.exit, signal=None, errno=137, **kw):
+def quit_at(
+    *,
+    func: Callable[..., Any] = sys.exit,
+    signal: int = 0,
+    errno: int = 137,
+    **kw,
+) -> Callable[..., bool]:
     """Quit the program when the runned file is updated or signal is received."""
 
     def handler(*_):
@@ -136,7 +142,7 @@ def quit_at(*, func=sys.exit, signal=None, errno=137, **kw):
 
     #
 
-    def on_change(*, sleep=0.0):
+    def on_change(*, sleep=0.0) -> bool:
 
         if NeedRestart and signal:
             logger.warning(f'stop by {signal=}')
@@ -160,11 +166,12 @@ def quit_at(*, func=sys.exit, signal=None, errno=137, **kw):
 
         if sleep := (sleep or kw.get('sleep', 0.0)):
             time.sleep(sleep)
+
         return True
 
     #
 
-    def sleep(wait: float = 0.0, /, poll=0.0):
+    def sleep(wait: float = 0.0, /, poll=0.0) -> bool:
         if not wait:
             return True
 
