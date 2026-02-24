@@ -16,7 +16,7 @@ from kain.internals import (
     get_owner,
 )
 
-__all__ = 'cache', 'class_property', 'mixed_property', 'pin', 'proxy_to'
+__all__ = "cache", "class_property", "mixed_property", "pin", "proxy_to"
 
 Nothing = Missing()
 logger = getLogger(__name__)
@@ -46,8 +46,10 @@ def cache(limit: Any = None):
         if func(limit):
             return function()(limit)
 
-    if limit is not None and (not isinstance(limit, float | int) or limit <= 0):
-        msg = f'limit must be None or positive integer, not {Who.Is(limit)}'
+    if limit is not None and (
+        not isinstance(limit, float | int) or limit <= 0
+    ):
+        msg = f"limit must be None or positive integer, not {Who.Is(limit)}"
         raise TypeError(msg)
 
     return function(maxsize=limit) if limit else function()
@@ -90,7 +92,9 @@ def parent_call(func):
                 index=func.__name__ not in Is.classOf(node).__dict__,
             )
 
-            return func(node, extract_wrapped(desc)(node, *args, **kw), *args, **kw)
+            return func(
+                node, extract_wrapped(desc)(node, *args, **kw), *args, **kw,
+            )
 
         except RecursionError as e:
             msg = (
@@ -110,10 +114,10 @@ def invokation_context_check(func):
         if (klass := self.klass) is not None and (
             node is None or klass != Is.Class(node)
         ):
-            msg = f'{Who(func)} exception, {self.header_with_context(node)}, {node=}'
+            msg = f"{Who(func)} exception, {self.header_with_context(node)}, {node=}"
 
             if node is None and not klass:
-                msg = f'{msg}; looks like as non-instance invokation'
+                msg = f"{msg}; looks like as non-instance invokation"
             raise ContextFaultError(msg)
 
         return func(self, node, *args, **kw)
@@ -140,9 +144,9 @@ class AbstractProperty:
     @cached_property
     def header(self):
         try:
-            return f'{self.title}({self.function!a})'
+            return f"{self.title}({self.function!a})"
         except Exception:  # noqa: BLE001
-            return f'{self.title}({Who(self.function)})'
+            return f"{self.title}({Who(self.function)})"
 
     def header_with_context(self, node):
         raise NotImplementedError
@@ -160,11 +164,11 @@ class CustomCallbackMixin:
     @classmethod
     def ttl(cls, expire: float):
         if not isinstance(expire, float | int):
-            msg = f'expire must be float or int, not {Who.Cast(expire)}'
+            msg = f"expire must be float or int, not {Who.Cast(expire)}"
             raise TypeError(msg)
 
         if expire <= 0:
-            msg = f'expire must be positive number, not {expire!r}'
+            msg = f"expire must be positive number, not {expire!r}"
             raise ValueError(msg)
 
         def is_actual(self, node, value=Nothing):  # noqa: ARG001
@@ -177,21 +181,21 @@ class InsteadProperty(AbstractProperty, CustomCallbackMixin):
     def __init__(self, function):
         if iscoroutinefunction(function):
             msg = (
-                f'{Who(function)} is coroutine function, '
-                'you must use @pin.native instead of just @pin'
+                f"{Who(function)} is coroutine function, "
+                "you must use @pin.native instead of just @pin"
             )
             raise TypeError(msg)
         super().__init__(function)
 
     @cached_property
     def title(self):
-        return f'instance just-replace-descriptor {Who(self, addr=True)}'
+        return f"instance just-replace-descriptor {Who(self, addr=True)}"
 
     def header_with_context(self, node):
         return (
-            f'{self.header} called with '
+            f"{self.header} called with "
             f'{("instance", "class")[Is.Class(node)]} '
-            f'({Who(node, addr=True)})'
+            f"({Who(node, addr=True)})"
         )
 
     def __get__(self, node, klass=Nothing):
@@ -206,7 +210,7 @@ class InsteadProperty(AbstractProperty, CustomCallbackMixin):
         return value
 
     def __delete__(self, node):
-        msg = f'{self.header_with_context(node)}: deleter called'
+        msg = f"{self.header_with_context(node)}: deleter called"
         raise ReadOnlyError(msg)
 
 
@@ -217,24 +221,28 @@ class BaseProperty(AbstractProperty):
 
     @InsteadProperty
     def is_data(self):
-        return bool(hasattr(self, '__set__') or hasattr(self, '__delete__'))
+        return bool(hasattr(self, "__set__") or hasattr(self, "__delete__"))
 
     @InsteadProperty
     def title(self):
-        mode = 'mixed' if self.klass is None else ('instance', 'class')[self.klass]
+        mode = (
+            "mixed"
+            if self.klass is None
+            else ("instance", "class")[self.klass]
+        )
 
-        prefix = ('', 'data ')[self.is_data]
-        return f'{mode} {prefix}descriptor {Who(self, addr=True)}'.strip()
+        prefix = ("", "data ")[self.is_data]
+        return f"{mode} {prefix}descriptor {Who(self, addr=True)}".strip()
 
     def header_with_context(self, node):
         if node is None:
-            mode = 'mixed' if self.klass is None else 'undefined'
+            mode = "mixed" if self.klass is None else "undefined"
         else:
-            mode = ('instance', 'class')[Is.Class(node)]
+            mode = ("instance", "class")[Is.Class(node)]
         return (
-            f'{self.header} with {mode} type called with'
+            f"{self.header} with {mode} type called with"
             f'{("instance", "class")[Is.Class(node)]} '
-            f'({Who(node, addr=True)})'
+            f"({Who(node, addr=True)})"
         )
 
     @invokation_context_check
@@ -250,16 +258,16 @@ class BaseProperty(AbstractProperty):
             return ensure_future(value)
 
         except AttributeError as e:
-            error = AttributeException(str(e).rsplit(':', 1)[-1])
+            error = AttributeException(str(e).rsplit(":", 1)[-1])
 
             error.exception = e
             raise error from e
 
     def __str__(self):
-        return f'<{self.header}>'
+        return f"<{self.header}>"
 
     def __repr__(self):
-        return f'<{self.title}>'
+        return f"<{self.title}>"
 
     def __get__(self, instance, klass):
         if instance is None and self.klass is False:
@@ -282,9 +290,11 @@ class InheritedClass(BaseProperty):
         """Make child-aware class from plain parent-based."""
 
         name: str = Who.Is(parent, full=False)
-        suffix: str = f'{"_" if name == name.lower() else ""}inherited'.capitalize()
+        suffix: str = (
+            f'{"_" if name == name.lower() else ""}inherited'.capitalize()
+        )
 
-        result: type[BaseProperty] = type(f'{name}{suffix}', (cls, parent), {})
+        result: type[BaseProperty] = type(f"{name}{suffix}", (cls, parent), {})
         result.here = parent
         return result
 
@@ -294,7 +304,7 @@ class Cached(BaseProperty, CustomCallbackMixin):
     def __init__(self, function: Callable, is_actual=Nothing):
         super().__init__(function)
 
-        if method := getattr(Is.classOf(self), 'is_actual', None):
+        if method := getattr(Is.classOf(self), "is_actual", None):
             if is_actual:
                 msg = (
                     f"{Who.Is(self)}.is_actual method ({Who.Cast(method)}) "
@@ -308,7 +318,7 @@ class Cached(BaseProperty, CustomCallbackMixin):
     def get_cache(self, node):
         name = f'__{("instance", "class")[Is.Class(node)]}_memoized__'
 
-        if hasattr(node, '__dict__'):
+        if hasattr(node, "__dict__"):
             with suppress(KeyError):
                 return node.__dict__[name]
 
@@ -390,7 +400,6 @@ class PostCachedProperty(MixedProperty, Cached):
         return super().__set__(node, value)
 
 
-#
 
 
 class pin(InsteadProperty):  # noqa: N801
@@ -408,7 +417,6 @@ class class_property(ClassProperty): ...  # noqa: N801
 class mixed_property(MixedProperty): ...  # noqa: N801
 
 
-#
 
 
 def proxy_to(  # noqa: PLR0915
@@ -443,12 +451,12 @@ def proxy_to(  # noqa: PLR0915
         if not mapping_list or (
             len(mapping_list) == 1 and not isinstance(mapping_list[0], str)
         ):
-            raise ValueError(f'empty {mapping_list=} for {pivot=}')
+            raise ValueError(f"empty {mapping_list=} for {pivot=}")
 
         for method in mapping_list:
 
-            if safe and not method.startswith('_') and get_attr(cls, method):
-                msg = f'{Who(cls)} already exists {method!a}: {get_attr(cls, method)}'
+            if safe and not method.startswith("_") and get_attr(cls, method):
+                msg = f"{Who(cls)} already exists {method!a}: {get_attr(cls, method)}"
                 raise TypeError(msg)
 
             def wrapper(name, node):
@@ -474,15 +482,15 @@ def proxy_to(  # noqa: PLR0915
 
                 if entity is None:
                     msg = (
-                        f'{Who(node)}.{name} {Who.Name(getter)[:4]}-proxied -> '
-                        f'{Who(node)}.{pivot}.{name}, but current '
-                        f'{Who(node)}.{pivot} is None'
+                        f"{Who(node)}.{name} {Who.Name(getter)[:4]}-proxied -> "
+                        f"{Who(node)}.{pivot}.{name}, but current "
+                        f"{Who(node)}.{pivot} is None"
                     )
 
                     if default is Nothing:
                         raise AttributeError(msg)
 
-                    msg = f'{msg}; return {Who.Is(default)}'
+                    msg = f"{msg}; return {Who.Is(default)}"
                     logger.warning(msg)
                     result = default
 
@@ -501,14 +509,14 @@ def proxy_to(  # noqa: PLR0915
                         if default is Nothing:
                             raise Is.classOf(e)(msg) from e
 
-                        msg = f'{msg}; return {Who.Is(default)}'
+                        msg = f"{msg}; return {Who.Is(default)}"
                         logger.warning(msg)
                         result = default
 
                 return partial(pre, result) if pre else result
 
             wrapper.__name__ = method
-            wrapper.__qualname__ = f'{pivot}.{method}'
+            wrapper.__qualname__ = f"{pivot}.{method}"
 
             if bind is None:
                 node = cls.__dict__[pivot]
@@ -519,7 +527,7 @@ def proxy_to(  # noqa: PLR0915
             else:
                 wrap = partial(wrapper, method)
                 wrap.__name__ = method
-                wrap.__qualname__ = f'{pivot}.{method}'
+                wrap.__qualname__ = f"{pivot}.{method}"
                 value = bind(wrap)
 
             fields.append(method)

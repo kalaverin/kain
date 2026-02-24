@@ -16,7 +16,7 @@ from kain.classes import Singleton
 from kain.descriptors import cache
 from kain.internals import Who
 
-__all__ = 'on_quit', 'quit_at'
+__all__ = "on_quit", "quit_at"
 
 logger = getLogger(__name__)
 NeedRestart = False
@@ -55,8 +55,10 @@ class OnSystemExit(metaclass=Singleton):
         for hook in (*self.hooks_chain, self.original_hook):
             try:
                 hook(exc_type, exc_value, traceback)
-            except Exception as e:  # noqa: BLE001,PERF203
-                warnings.warn(f'{Who(hook)}: {e!r}', RuntimeWarning, stacklevel=2)
+            except Exception as e:  # noqa: BLE001
+                warnings.warn(
+                    f"{Who(hook)}: {e!r}", RuntimeWarning, stacklevel=2,
+                )
 
         self.teardown()
 
@@ -75,7 +77,9 @@ class OnSystemExit(metaclass=Singleton):
         if args.exc_type is SystemExit:
             return
 
-        self.exceptions_hooks_proxy(args.exc_type, args.exc_value, args.exc_traceback)
+        self.exceptions_hooks_proxy(
+            args.exc_type, args.exc_value, args.exc_traceback,
+        )
 
     def restore_original_handlers(self) -> None:
         bind(signal.SIGINT, signal.SIG_DFL)
@@ -85,7 +89,6 @@ class OnSystemExit(metaclass=Singleton):
         sys.excepthook = self.original_hook
         threading.excepthook = threading.__excepthook__
 
-    #
 
     def schedule(self, func: Callable) -> None:
         self.callbacks.append(func)
@@ -93,7 +96,6 @@ class OnSystemExit(metaclass=Singleton):
     def add_hook(self, func: Callable) -> None:
         self.hooks_chain.append(func)
 
-    #
 
     def teardown(self) -> None:
         if self.already_called:
@@ -103,8 +105,10 @@ class OnSystemExit(metaclass=Singleton):
             for func in self.callbacks:
                 try:
                     func()
-                except BaseException as e:  # noqa: BLE001,PERF203
-                    warnings.warn(f'{Who(func)}: {e!r}', RuntimeWarning, stacklevel=2)
+                except BaseException as e:  # noqa: BLE001
+                    warnings.warn(
+                        f"{Who(func)}: {e!r}", RuntimeWarning, stacklevel=2,
+                    )
 
         finally:
             self.already_called = True
@@ -133,19 +137,18 @@ def quit_at(
     def handler(*_):
         global NeedRestart  # noqa: PLW0603
         NeedRestart = True
-        logger.warning(f'{signal=} received')
+        logger.warning(f"{signal=} received")
 
     if signal:
         bind(signal, handler)
 
     initial_stamp = get_mtime()
 
-    #
 
     def on_change(*, sleep=0.0) -> bool:
 
         if NeedRestart and signal:
-            logger.warning(f'stop by {signal=}')
+            logger.warning(f"stop by {signal=}")
             func(errno)
             return False
 
@@ -154,28 +157,27 @@ def quit_at(
                 file = str(get_selfpath())
                 when = datetime.utcfromtimestamp(ctime)
                 logger.warning(
-                    f'{file=} updated at {when} '
-                    f'({time.time() - ctime:.2f}s ago), stop'
+                    f"{file=} updated at {when} "
+                    f"({time.time() - ctime:.2f}s ago), stop",
                 )
                 func(errno)
                 return False
 
         except FileNotFoundError:
-            logger.warning(f'{get_selfpath()} removed? stop')
+            logger.warning(f"{get_selfpath()} removed? stop")
             return False
 
-        if sleep := (sleep or kw.get('sleep', 0.0)):
+        if sleep := (sleep or kw.get("sleep", 0.0)):
             time.sleep(sleep)
 
         return True
 
-    #
 
     def sleep(wait: float = 0.0, /, poll=0.0) -> bool:
         if not wait:
             return True
 
-        poll = poll or kw.get('poll', 2.5)
+        poll = poll or kw.get("poll", 2.5)
         deadline = time.time() + wait
 
         while (solution := on_change()) and time.time() < deadline:

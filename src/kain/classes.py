@@ -1,6 +1,6 @@
 from kain.internals import Who
 
-__all__ = 'Missing', 'Nothing', 'Singleton'
+__all__ = "Missing", "Nothing", "Singleton"
 
 
 class Singleton(type):
@@ -9,7 +9,7 @@ class Singleton(type):
         super().__init__(name, parents, attrbutes)
 
     def __call__(cls, *args, **kw):
-        if not hasattr(cls, 'instance'):
+        if not hasattr(cls, "instance"):
             cls.instance = super().__call__(*args, **kw)
         return cls.instance
 
@@ -26,7 +26,7 @@ class Missing:
         return False
 
     def __repr__(self):
-        return f'<{Who.Name(self, addr=True)}>'
+        return f"<{Who.Name(self, addr=True)}>"
 
 
 Nothing = Missing()

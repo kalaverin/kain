@@ -30,18 +30,18 @@ Collections = deque, dict, list, set, tuple, bytearray
 Primitives = bool, float, int, str, complex, bytes
 Builtins = Primitives + Collections
 
-WinNT = 'windows' in architecture()[1].lower()
+WinNT = "windows" in architecture()[1].lower()
 
 __all__ = (
-    'Is',
-    'Who',
-    'get_attr',
-    'get_owner',
-    'iter_inheritance',
-    'iter_stack',
-    'to_ascii',
-    'to_bytes',
-    'unique',
+    "Is",
+    "Who",
+    "get_attr",
+    "get_owner",
+    "iter_inheritance",
+    "iter_stack",
+    "to_ascii",
+    "to_bytes",
+    "unique",
 )
 
 
@@ -61,12 +61,17 @@ def is_collection(obj: Any) -> bool:
             and not isinstance(obj, bytes | str)
         )
         or is_mapping(obj)
-        or all(map(partial(hasattr, obj), ('__getitem__', '__setitem__', '__delitem__')))
+        or all(
+            map(
+                partial(hasattr, obj),
+                ("__getitem__", "__setitem__", "__delitem__"),
+            ),
+        )
     )
 
 
 def is_iterable(obj: Any) -> bool:
-    return isinstance(obj, Iterable) or hasattr(obj, '__iter__')
+    return isinstance(obj, Iterable) or hasattr(obj, "__iter__")
 
 
 def is_mapping(obj: Any) -> bool:
@@ -86,8 +91,8 @@ def is_from_builtin(obj: Any) -> bool:
 
 
 def is_interactive() -> bool:
-    if not getattr(sys, 'frozen', False):  # nuitka compiler checks this
-        return all(map(methodcaller('isatty'), (stderr, stdin, stdout)))
+    if not getattr(sys, "frozen", False):  # nuitka compiler checks this
+        return all(map(methodcaller("isatty"), (stderr, stdin, stdout)))
     return False
 
 
@@ -100,10 +105,10 @@ def _get_module_path_type(full: Any) -> tuple[bool | None, str]:
         path = path.lower()
 
     for scheme, reason in (
-        ('stdlib', True),
-        ('purelib', False),
-        ('platlib', False),
-        ('platstdlib', True),
+        ("stdlib", True),
+        ("purelib", False),
+        ("platlib", False),
+        ("platstdlib", True),
     ):
         subdir = dirs[scheme]
         if WinNT:
@@ -129,7 +134,7 @@ def is_internal(x: Any) -> bool:
 
     if module := get_module(x):
 
-        if module.__name__ == 'builtins':
+        if module.__name__ == "builtins":
             return True
 
         is_stdlib = _get_module_path_type(module.__file__)[0]
@@ -161,7 +166,9 @@ def is_subclass(obj: Any, types) -> bool:  # noqa: PLR0911
             # Any | None
             return True
 
-        if origin is UnionType and (issubclass(cls, types) or (args and cls in args)):
+        if origin is UnionType and (
+            issubclass(cls, types) or (args and cls in args)
+        ):
             return True
 
         if class_of(types) is GenericAlias:
@@ -187,20 +194,22 @@ def get_module_name(x: Any) -> str | None:
 
 def object_name(obj: Any, full=True) -> str:
     def post(x):
-        return sub(r'^([\?\.]+)', '', sub('^(__main__|__builtin__|builtins)', '', x))
+        return sub(
+            r"^([\?\.]+)", "", sub("^(__main__|__builtin__|builtins)", "", x),
+        )
 
     def get_module_from(x):
-        return getattr(x, '__module__', get_module_name(x)) or '?'
+        return getattr(x, "__module__", get_module_name(x)) or "?"
 
     def get_object_name(x: Any):
         if obj is Any:
-            return 'typing.Any' if full else 'Any'
+            return "typing.Any" if full else "Any"
 
-        name: str = getattr(x, '__qualname__', str(x.__name__))
+        name: str = getattr(x, "__qualname__", str(x.__name__))
         module = get_module_from(x)
 
         if not name.startswith(module):
-            name = f'{module}.{name}'
+            name = f"{module}.{name}"
         return name
 
     def main(obj: Any):
@@ -211,7 +220,7 @@ def object_name(obj: Any, full=True) -> str:
             if itis(obj):
                 name = get_object_name(obj)
                 with suppress(AttributeError):
-                    name = f'{object_name(obj.im_self or obj.im_class)}.{post(name)}'
+                    name = f"{object_name(obj.im_self or obj.im_class)}.{post(name)}"
                 return name
 
         cls = class_of(obj)
@@ -221,32 +230,32 @@ def object_name(obj: Any, full=True) -> str:
         return get_object_name(cls)
 
     name = post(main(obj))
-    return name if full else name.rsplit('.', 1)[-1]
+    return name if full else name.rsplit(".", 1)[-1]
 
 
 def pretty_module(obj: Any) -> str:
-    return who_is(obj).rsplit('.', 1)[0]
+    return who_is(obj).rsplit(".", 1)[0]
 
 
 def source_file(obj: Any, template=None, **kw) -> str:
-    kw.setdefault('exclude_self', False)
-    kw.setdefault('exclude_stdlib', False)
+    kw.setdefault("exclude_self", False)
+    kw.setdefault("exclude_stdlib", False)
 
     for child in iter_inheritance(class_of(obj), **kw):
         try:
             if path := getsourcefile(child):
                 return (template % path) if template else str(path)
-        except TypeError:  # noqa: PERF203
+        except TypeError:
             ...
 
 
 def just_value(obj: Any, /, **kw) -> str:
-    kw.setdefault('addr', False)
+    kw.setdefault("addr", False)
 
     name = who_is(obj, **kw)
     if isclass(obj):
-        return f'({name})'
-    return f'({name}){obj}'
+        return f"({name})"
+    return f"({name}){obj}"
 
 
 @cache
@@ -255,16 +264,17 @@ def is_imported_module(name: str) -> bool:
     with suppress(KeyError):
         return bool(modules[name])
 
-    chunks = name.split('.')
+    chunks = name.split(".")
     return (
-        sum('.'.join(chunks[: no + 1]) in modules for no in range(len(chunks))) >= 2
-    )  # noqa: PLR2004
+        sum(".".join(chunks[: no + 1]) in modules for no in range(len(chunks)))
+        >= 2
+    )
 
 
 def get_mro(obj, /, **kw):
 
-    func: Any = kw.pop('func', None)
-    glue: Any = kw.pop('glue', None)
+    func: Any = kw.pop("func", None)
+    glue: Any = kw.pop("glue", None)
 
     result = iter_inheritance(obj, **kw)
 
@@ -277,7 +287,6 @@ def get_mro(obj, /, **kw):
     return result if func else tuple(result)
 
 
-#
 
 
 def simple_repr(x: Any) -> bool | str | None:
@@ -292,13 +301,13 @@ def simple_repr(x: Any) -> bool | str | None:
 
 def format_args_and_keywords(*args, **kw) -> str:
     def format_args(x):
-        return repr(tuple(map(simple_repr, x)))[1:-1].rstrip(',')
+        return repr(tuple(map(simple_repr, x)))[1:-1].rstrip(",")
 
     def format_kwargs(x):
-        return ', '.join(f'{k}={simple_repr(v)}' for k, v in x.items())
+        return ", ".join(f"{k}={simple_repr(v)}" for k, v in x.items())
 
     if args and kw:
-        return f'{format_args(args)}, {format_kwargs(kw)}'
+        return f"{format_args(args)}, {format_kwargs(kw)}"
 
     if args:
         return format_args(args)
@@ -306,14 +315,14 @@ def format_args_and_keywords(*args, **kw) -> str:
     if kw:
         return format_kwargs(kw)
 
-    return ''
+    return ""
 
 
 # public interface, Is/Who
 
 
-def who_is(obj: Any, /, full=True, addr=False) -> str:  # noqa: N802
-    key = '__name_full__' if full else '__name_short__'
+def who_is(obj: Any, /, full=True, addr=False) -> str:
+    key = "__name_full__" if full else "__name_short__"
 
     def get_name() -> str:
         try:
@@ -332,7 +341,7 @@ def who_is(obj: Any, /, full=True, addr=False) -> str:  # noqa: N802
     name = get_name()
     if not addr:
         return name
-    return f'{name}#{id(obj):x}'
+    return f"{name}#{id(obj):x}"
 
 
 @dataclass
@@ -347,7 +356,6 @@ class Who:
     Name: partial[str] = partial(who_is, full=False)
 
 
-#
 
 
 @dataclass
@@ -378,7 +386,7 @@ class Is:
 
 
 def iter_stack(*args, **kw):
-    result = stack()[kw.pop('offset', 0) :]
+    result = stack()[kw.pop("offset", 0) :]
     yield from (map(itemgetter(*args), result) if args else result)
 
 
@@ -422,11 +430,13 @@ def iter_inheritance(  # noqa: PLR0913
     yield from order
 
 
-def _get_attribute_from_inheritance(obj: Any, name: str, **kw) -> tuple[Any, Any]:
+def _get_attribute_from_inheritance(
+    obj: Any, name: str, **kw,
+) -> tuple[Any, Any]:
 
-    index = kw.pop('index', 0)
-    kw.setdefault('exclude_self', False)
-    kw.setdefault('exclude_stdlib', False)
+    index = kw.pop("index", 0)
+    kw.setdefault("exclude_self", False)
+    kw.setdefault("exclude_stdlib", False)
 
     counter = 0
     for child in iter_inheritance(obj, **kw):
@@ -457,25 +467,25 @@ def get_attr(obj: Any, name: str, default: Any = None, **kw) -> Any:
 
 def to_ascii(x: str, /, charset: str | None = None) -> str:
     if not isinstance(x, bytes | str):
-        msg = f'only bytes | str acceptable, not {just_value(x)}'
+        msg = f"only bytes | str acceptable, not {just_value(x)}"
         raise TypeError(msg)
 
     if isinstance(x, str):
         return x
 
-    charset = charset or 'ascii'
+    charset = charset or "ascii"
     return to_bytes(x, charset=charset).decode(charset)
 
 
 def to_bytes(x: str, /, charset: str | None = None) -> bytes:
     if not isinstance(x, bytes | str):
-        msg = f'only bytes | str acceptable, not {just_value(x)}'
+        msg = f"only bytes | str acceptable, not {just_value(x)}"
         raise TypeError(msg)
 
     if not isinstance(x, str):
         return x
 
-    return x.encode(charset or 'ascii')
+    return x.encode(charset or "ascii")
 
 
 def unique(iterable, /, key=None, include=None, exclude=None):

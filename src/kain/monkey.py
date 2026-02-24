@@ -34,11 +34,11 @@ class Monkey:
             node, name = module, new.__name__
 
         else:
-            path, name = module.rsplit('.', 1)
+            path, name = module.rsplit(".", 1)
             try:
                 node = required(path)
             except ImportError:
-                logger.error(f'{module=} import error')  # noqa: TRY400
+                logger.error(f"{module=} import error")  # noqa: TRY400
                 raise
 
         if getattr(node, name, None) is new:
@@ -52,7 +52,7 @@ class Monkey:
             raise RuntimeError
 
         cls.mapping[new] = old
-        logger.debug(f'{Who.Addr(old)} -> {Who.Addr(new)}')
+        logger.debug(f"{Who.Addr(old)} -> {Who.Addr(new)}")
         return new
 
     @classmethod
@@ -68,7 +68,7 @@ class Monkey:
 
             local = name or func.__name__
             setattr(node, local, wrapper)
-            logger.info(f'{Who.Is(node)}.{local} <- {Who.Addr(func)}')
+            logger.info(f"{Who.Is(node)}.{local} <- {Who.Addr(func)}")
             return wrapper
 
         return bind
@@ -89,7 +89,7 @@ class Monkey:
             def wrapper(*args, **kw):
                 return func(wrapped_func, *args, **kw)
 
-            logger.info(f'{Who.Is(node)}.{wrapped_name} <- {Who.Addr(func)}')
+            logger.info(f"{Who.Is(node)}.{wrapped_name} <- {Who.Addr(func)}")
 
             wrapped = decorator(wrapper) if decorator else wrapper
             cls.patch((node, wrapped_name), wrapped)

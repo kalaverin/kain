@@ -9,30 +9,30 @@ from pathlib import Path
 
 from kain.internals import Who, iter_stack, to_ascii, unique
 
-__all__ = 'add_path', 'optional', 'required'
+__all__ = "add_path", "optional", "required"
 
 logger = getLogger(__name__)
 
 
 IGNORED_OBJECT_FIELDS = {
-    '__builtins__',
-    '__cached__',
-    '__doc__',
-    '__file__',
-    '__loader__',
-    '__name__',
-    '__package__',
-    '__path__',
-    '__spec__',
+    "__builtins__",
+    "__cached__",
+    "__doc__",
+    "__file__",
+    "__loader__",
+    "__name__",
+    "__package__",
+    "__path__",
+    "__spec__",
 }
 
-PACKAGES_MAP = {'magic': 'python-magic', 'git': 'gitpython'}
+PACKAGES_MAP = {"magic": "python-magic", "git": "gitpython"}
 
 
 @cache
 def get_module(path):
 
-    chunks = path.split('.')
+    chunks = path.split(".")
     count = len(chunks) + 1
 
     if count == 2:  # noqa: PLR2004
@@ -40,7 +40,7 @@ def get_module(path):
             return import_module(path), ()
 
     for i in range(1, count):
-        chunk = '.'.join(chunks[: count - i])
+        chunk = ".".join(chunks[: count - i])
         with suppress(ModuleNotFoundError):
             return import_module(chunk), tuple(chunks[count - i :])
 
@@ -56,20 +56,20 @@ def get_child(path, parent, child):
         if not ismodule(parent):
             raise ImportError(
                 f"{path} (object {Who(parent)!a} hasn't attribute "
-                f"{child!a}{Who.File(parent, ' in %a') or ''})"
+                f"{child!a}{Who.File(parent, ' in %a') or ''})",
             )
 
         if not set(dir(parent)) - IGNORED_OBJECT_FIELDS:
-            chunk = f'{Who(parent)}.{child}'
+            chunk = f"{Who(parent)}.{child}"
             raise ImportError(
-                f'{path} (from partially initialized module '
-                f'{chunk!a}, most likely due to a circular import'
-                f'{Who.File(parent, " from %a") or ""}) or just not found'
+                f"{path} (from partially initialized module "
+                f"{chunk!a}, most likely due to a circular import"
+                f'{Who.File(parent, " from %a") or ""}) or just not found',
             )
 
         raise ImportError(
             f"{path} (module {Who(parent)!a} hasn't member {child!a}"
-            f"{Who.File(parent, ' in %a') or ''})"
+            f"{Who.File(parent, ' in %a') or ''})",
         )
 
     return getattr(parent, child)
@@ -77,7 +77,7 @@ def get_child(path, parent, child):
 
 def import_object(path, something=None):
     if path is something is None:
-        raise TypeError('all arguments is None')
+        raise TypeError("all arguments is None")
 
     if isinstance(path, str | bytes):
         path = to_ascii(path)
@@ -91,11 +91,11 @@ def import_object(path, something=None):
             raise TypeError(msg)
         path, something = something, path
 
-    logger.debug(f'lookup: {path}')
+    logger.debug(f"lookup: {path}")
 
     if something:
-        locator = f'{Who(something)}.{path}'
-        sequence = path.split('.')
+        locator = f"{Who(something)}.{path}"
+        sequence = path.split(".")
 
     else:
         locator = str(path)
@@ -105,17 +105,17 @@ def import_object(path, something=None):
             raise ImportError(f"{path} (isn't exists?)")
 
     if not sequence:
-        logger.debug(f'import path: {Who(something)}')
+        logger.debug(f"import path: {Who(something)}")
 
     else:
         logger.debug(
-            f'split path: {Who(something)} (module) -> {".".join(sequence)} (path)'
+            f'split path: {Who(something)} (module) -> {".".join(sequence)} (path)',
         )
 
     for name in sequence:
         something = get_child(locator, something, name)
 
-    logger.debug('load ok: %s', path)
+    logger.debug("load ok: %s", path)
     return something
 
 
@@ -131,9 +131,9 @@ def required(path, *args, **kw):
 
     """
 
-    throw = kw.pop('throw', True)
-    quiet = kw.pop('quiet', False)
-    default = kw.pop('default', None)
+    throw = kw.pop("throw", True)
+    quiet = kw.pop("quiet", False)
+    default = kw.pop("default", None)
 
     try:
         try:
@@ -147,10 +147,10 @@ def required(path, *args, **kw):
         if not quiet or throw:
             msg = f"couldn't import required({path=}, *{args=}, **{kw=})"
 
-            base = path.split('.', 1)[0]
+            base = path.split(".", 1)[0]
             if base not in sys.modules:
-                package = (PACKAGES_MAP.get(base) or base).replace('_', '-')
-                msg = f'{msg}; (need extra {package=}?)'
+                package = (PACKAGES_MAP.get(base) or base).replace("_", "-")
+                msg = f"{msg}; (need extra {package=}?)"
 
             if not quiet:
                 logger.warning(msg)
@@ -162,12 +162,12 @@ def required(path, *args, **kw):
 
 
 def optional(path, *args, **kw):
-    kw.setdefault('quiet', True)
-    kw.setdefault('throw', False)
+    kw.setdefault("quiet", True)
+    kw.setdefault("throw", False)
     return required(path, *args, **kw)
 
 
-sort = optional('natsort.natsorted', quiet=True, default=sorted)
+sort = optional("natsort.natsorted", quiet=True, default=sorted)
 
 
 def get_path(path, root=None):  # noqa: PLR0912
@@ -184,12 +184,12 @@ def get_path(path, root=None):  # noqa: PLR0912
         root = Path(root)
     else:
         raise TypeError(
-            f'root={root!r} can be str | {Who(Path)} | None, not {Who.Is(root)}'
+            f"root={root!r} can be str | {Who(Path)} | None, not {Who.Is(root)}",
         )
 
-    spath = str(path).strip('/')
+    spath = str(path).strip("/")
 
-    if set(spath) == {'.'}:
+    if set(spath) == {"."}:
         dots = len(spath) - 2
         if dots == -1:
             return path
@@ -200,14 +200,14 @@ def get_path(path, root=None):  # noqa: PLR0912
 
         return path.resolve()
 
-    if spath.startswith('../'):
+    if spath.startswith("../"):
         return (root / path).resolve()
 
-    if sep in path and ('../' not in spath and '/..' not in spath):
+    if sep in path and ("../" not in spath and "/.." not in spath):
         try:
             idx = str(root).index(str(path))
         except ValueError as e:
-            raise ValueError(f'{path=} not found in {root=}') from e
+            raise ValueError(f"{path=} not found in {root=}") from e
         return Path(str(root)[:idx])
 
     subdir = str(root)
@@ -219,7 +219,7 @@ def get_path(path, root=None):  # noqa: PLR0912
         if path == future.name:
             return future
 
-    raise ValueError(f'{path=} not found in {root=}')
+    raise ValueError(f"{path=} not found in {root=}")
 
 
 def add_path(path, **kw):
@@ -243,12 +243,12 @@ def add_path(path, **kw):
     elif not (str(path).startswith(sep) or path == path.resolve()):
         root = get_path(path, **kw)
         if not root:
-            raise ValueError(f'{path=} not found, {logger.Args(**kw)}')
-        path = root if str(path).startswith('.') else (root / path).resolve()
+            raise ValueError(f"{path=} not found, {logger.Args(**kw)}")
+        path = root if str(path).startswith(".") else (root / path).resolve()
 
     if path not in sys.path:
         sys.path.append(str(path.resolve()))
         sys.path = list(unique(sys.path))
         exists = path.is_dir()
-        logger.info(f'path {request} resolved to {path}, {exists=}')
+        logger.info(f"path {request} resolved to {path}, {exists=}")
     return path
