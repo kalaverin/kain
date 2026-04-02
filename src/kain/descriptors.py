@@ -16,7 +16,12 @@ from kain.internals import (
     get_owner,
 )
 
-__all__ = "cache", "class_property", "mixed_property", "pin", "proxy_to"
+__all__ = (
+    "cache",
+    "class_property",
+    "mixed_property",
+    "pin",
+)
 
 Nothing = Missing()
 logger = getLogger(__name__)
