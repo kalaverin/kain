@@ -221,10 +221,12 @@ def object_name(obj: Any, full: bool = True) -> str:
         return getattr(x, "__module__", get_module_name(x)) or "?"
 
     def get_object_name(x: Any) -> str:
-        if obj is Any:
+        if x is Any:
             return "typing.Any" if full else "Any"
 
-        name: str = getattr(x, "__qualname__", str(x.__name__))
+        name: str = getattr(
+            x, "__qualname__", getattr(x, "__name__", str(x)),
+        )
         module = get_module_from(x)
 
         if not name.startswith(module):
@@ -247,8 +249,16 @@ def object_name(obj: Any, full: bool = True) -> str:
                 return name
 
         cls = class_of(obj)
-        if cls is property:
-            return get_object_name(obj.fget)
+        if cls in (property, classmethod, staticmethod):
+            if cls is property:
+                return get_object_name(obj.fget)
+            return get_object_name(cls)
+
+        if (
+            (hasattr(obj, "__qualname__") or hasattr(obj, "__name__"))
+            and (not isclass(obj) and not ismodule(obj))
+        ):
+            return get_object_name(obj)
 
         return get_object_name(cls)
 
@@ -369,7 +379,7 @@ def who_is(obj: Any, /, full: bool = True, addr: bool = False) -> str:
     return f"{name}#{id(obj):x}"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class Who:
     Args: Callable[..., str] = format_args_and_keywords
     Cast: Callable[..., str] = just_value
@@ -381,7 +391,7 @@ class Who:
     Name: partial[str] = partial(who_is, full=False)  # noqa: RUF009
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass
 class Is:
     Builtin: Callable[..., bool] = is_from_builtin
     Class: Callable[..., Any] = isclass

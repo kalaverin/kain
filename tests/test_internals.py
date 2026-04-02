@@ -4,8 +4,13 @@ from __future__ import annotations
 
 import os
 import sys
+import types
+import weakref
 from collections import deque
-from typing import Any
+from dataclasses import dataclass
+from enum import Enum
+from functools import partial, wraps
+from typing import Any, Generic, List, Literal, ParamSpec, Protocol, TypeVar
 
 import pytest
 
@@ -259,12 +264,182 @@ class TestObjectName:
     def test_object_name_builtin(self) -> None:
         assert object_name(1) == "int"
         assert object_name(int) == "int"
+        assert object_name("hello") == "str"
+        assert object_name(None) == "NoneType"
+        assert object_name(True) == "bool"
+
+    def test_object_name_classes(self) -> None:
+        assert object_name(type) == "type"
+        assert object_name(object) == "object"
 
     def test_object_name_module(self) -> None:
         assert object_name(os) == "os"
+        assert object_name(sys) == "sys"
 
     def test_object_name_not_full(self) -> None:
         assert object_name(1, full=False) == "int"
+        assert object_name(os, full=False) == "os"
+
+    def test_object_name_builtin_functions(self) -> None:
+        assert object_name(print) == "print"
+        assert object_name(len) == "len"
+
+    def test_object_name_user_function(self) -> None:
+        def my_func() -> None:
+            pass
+
+        assert object_name(my_func, full=False) == "my_func"
+
+    def test_object_name_lambda(self) -> None:
+        assert object_name(lambda x: x, full=False) == "<lambda>"
+
+    def test_object_name_methods(self) -> None:
+        class Foo:
+            def bar(self) -> None:
+                pass
+
+            @classmethod
+            def cls_method(cls) -> None:
+                pass
+
+            @staticmethod
+            def st_method() -> None:
+                pass
+
+        assert object_name(Foo, full=False) == "Foo"
+        assert object_name(Foo.bar, full=False) == "bar"
+        assert object_name(Foo().bar, full=False) == "bar"
+        assert object_name(Foo.cls_method, full=False) == "cls_method"
+        assert object_name(Foo().cls_method, full=False) == "cls_method"
+        assert object_name(Foo.st_method, full=False) == "st_method"
+        assert object_name(Foo().st_method, full=False) == "st_method"
+        # full=True retains class qualification
+        assert object_name(Foo.bar).endswith(".Foo.bar")
+
+    def test_object_name_property(self) -> None:
+        class Foo:
+            @property
+            def prop(self) -> int:
+                return 1
+
+        assert object_name(Foo.prop, full=False) == "prop"
+        assert object_name(Foo.prop).endswith(".Foo.prop")
+
+    def test_object_name_async(self) -> None:
+        async def async_func() -> None:
+            pass
+
+        assert object_name(async_func, full=False) == "async_func"
+
+    def test_object_name_partial(self) -> None:
+        def my_func() -> None:
+            pass
+
+        assert object_name(partial(my_func)) == "functools.partial"
+
+    def test_object_name_builtin_methods(self) -> None:
+        assert object_name([].append) == "list.append"
+        assert object_name("".split) == "str.split"
+        assert object_name({}.get) == "dict.get"
+
+    def test_object_name_builtin_descriptors(self) -> None:
+        assert object_name(list.append) == "list.append"
+        assert object_name(object.__init__) == "object.__init__"
+        assert object_name([].__add__) == "list.__add__"
+
+    def test_object_name_typing_specials(self) -> None:
+        assert object_name(Any) == "typing.Any"
+
+    def test_object_name_enum(self) -> None:
+        class Color(Enum):
+            RED = 1
+
+        assert object_name(Color, full=False) == "Color"
+        assert object_name(Color.RED, full=False) == "Color"
+
+    def test_object_name_named_tuple(self) -> None:
+        from collections import namedtuple
+
+        Point = namedtuple("Point", ["x", "y"])
+        assert object_name(Point, full=False) == "Point"
+        assert object_name(Point(1, 2), full=False) == "Point"
+
+    def test_object_name_dataclass(self) -> None:
+        @dataclass
+        class Person:
+            name: str
+
+        assert object_name(Person, full=False) == "Person"
+        assert object_name(Person("bob"), full=False) == "Person"
+
+    def test_object_name_exceptions(self) -> None:
+        assert object_name(ValueError) == "ValueError"
+        assert object_name(ValueError()) == "ValueError"
+
+    def test_object_name_generator(self) -> None:
+        gen = (x for x in range(3))
+        assert object_name(gen, full=False) == "<genexpr>"
+
+    def test_object_name_slice(self) -> None:
+        assert object_name(slice(1, 2)) == "slice"
+
+    def test_object_name_memoryview(self) -> None:
+        assert object_name(memoryview(b"abc")) == "memoryview"
+
+    def test_object_name_weakref(self) -> None:
+        class Foo:
+            pass
+
+        ref = weakref.ref(Foo())
+        assert object_name(ref) == "weakref.ReferenceType"
+
+    def test_object_name_ellipsis(self) -> None:
+        assert object_name(...) == "ellipsis"
+
+    def test_object_name_not_implemented(self) -> None:
+        assert object_name(NotImplemented) == "NotImplementedType"
+
+    def test_object_name_code(self) -> None:
+        code = compile("1+1", "<string>", "eval")
+        assert object_name(code) == "code"
+
+    def test_object_name_wrapped_function(self) -> None:
+        def original() -> None:
+            pass
+
+        @wraps(original)
+        def wrapper() -> None:
+            pass
+
+        assert object_name(wrapper, full=False) == "original"
+
+    def test_object_name_nested_function(self) -> None:
+        def outer() -> None:
+            def inner() -> None:
+                pass
+            return inner
+
+        assert object_name(outer(), full=False) == "inner"
+
+    def test_object_name_typing_constructs(self) -> None:
+        assert object_name(TypeVar("T"), full=False) == "T"
+        assert object_name(ParamSpec("P"), full=False) == "P"
+        assert object_name(Protocol) == "typing.Protocol"
+        assert object_name(Generic) == "typing.Generic"
+        assert object_name(List) == "typing.List"
+        assert object_name(List[int]) == "typing.List"
+        assert object_name(Literal[1]) == "typing.Literal"
+
+    def test_object_name_async_generator(self) -> None:
+        async def agen() -> None:
+            yield 1
+
+        assert object_name(agen, full=False) == "agen"
+        assert object_name(agen(), full=False) == "agen"
+
+    def test_object_name_classmethod_staticmethod_descriptors(self) -> None:
+        assert object_name(classmethod(lambda x: x)) == "classmethod"
+        assert object_name(staticmethod(lambda x: x)) == "staticmethod"
 
 
 class TestWhoIs:
