@@ -6,7 +6,7 @@ STAGING := env('STAGING', 'crypto-1')
 DOCKER_TAG := env('DOCKER_TAG', 'crypto/analytics-wf')
 BASE_IMAGE := env('BASE_IMAGE', 'europe-west4-docker.pkg.dev/myexlab-ops/python/python:py-3.12.12-slim-trixie-feodor-uv')
 
-UV_INDEX_MYEXLAB_USERNAME := env('UV_INDEX_MYEXLAB_USERNAME', '__token__')
+UV_INDEX_PRIVATE_USERNAME := env('UV_INDEX_PRIVATE_USERNAME', '__token__')
 UV_INDEX_PRIVATE_PASSWORD := env('UV_INDEX_PRIVATE_PASSWORD', '')
 
 default:
@@ -73,7 +73,7 @@ dock:
     @uv lock --quiet
     docker buildx build --load \
         --build-arg BASE_IMAGE="{{BASE_IMAGE}}" \
-        --build-arg UV_INDEX_MYEXLAB_USERNAME="{{UV_INDEX_MYEXLAB_USERNAME}}" \
+        --build-arg UV_INDEX_PRIVATE_USERNAME="{{UV_INDEX_PRIVATE_USERNAME}}" \
         --build-arg UV_INDEX_PRIVATE_PASSWORD="{{UV_INDEX_PRIVATE_PASSWORD}}" \
         -t "{{DOCKER_TAG}}" .
 
@@ -85,7 +85,8 @@ run:
 # development method of running the application
 [group('project')]
 develop:
-    @uv run development.py
+    @cd .. && cd - && \
+    uv run development.py
 
 # forward ports from remote environment using kubefwd; don't forgot run `gcloud auth login`
 [group('project')]

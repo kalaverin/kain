@@ -200,16 +200,8 @@ repos:
         args:
           - --line-length
           - '79'
-  - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.20.0
-    hooks:
-      - id: markdownlint-cli2
-        name: check markdown files
-        args:
-          - --config
-          - etc/lint/.markdownlint-cli2.jsonc
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.10.3
+    rev: 0.11.2
     hooks:
       - id: uv-lock
         name: sync pyproject.toml and lock project dependencies to uv.lock

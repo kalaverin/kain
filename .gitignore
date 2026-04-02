@@ -1,9 +1,13 @@
 .*
 .*/
+/*.md
 *.egg-info/
 __pycache__/
 
 *.py[cdo]
+
+!INSTALL.md
+!README.md
 
 !.env.sample
 !.envrc
@@ -12,4 +16,3 @@ __pycache__/
 
 !etc/lint/.markdownlint-cli2.jsonc
 
-uv.lock
