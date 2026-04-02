@@ -426,8 +426,8 @@ class TestObjectName:
         assert object_name(ParamSpec("P"), full=False) == "P"
         assert object_name(Protocol) == "typing.Protocol"
         assert object_name(Generic) == "typing.Generic"
-        assert object_name(list) == "typing.List"
-        assert object_name(list[int]) == "typing.List"
+        assert object_name(list) == "list"
+        assert object_name(list[int]) == "list"
         assert object_name(Literal[1]) == "typing.Literal"
 
     def test_object_name_async_generator(self) -> None:
