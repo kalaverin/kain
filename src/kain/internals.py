@@ -369,7 +369,7 @@ def who_is(obj: Any, /, full: bool = True, addr: bool = False) -> str:
     return f"{name}#{id(obj):x}"
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Who:
     Args: Callable[..., str] = format_args_and_keywords
     Cast: Callable[..., str] = just_value
@@ -381,7 +381,7 @@ class Who:
     Name: partial[str] = partial(who_is, full=False)  # noqa: RUF009
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Is:
     Builtin: Callable[..., bool] = is_from_builtin
     Class: Callable[..., Any] = isclass
