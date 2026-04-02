@@ -16,3 +16,4 @@ __pycache__/
 
 !etc/lint/.markdownlint-cli2.jsonc
 
+uv.lock
