@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import os
 import sys
-import types
 import weakref
 from collections import deque
 from dataclasses import dataclass
 from enum import Enum
 from functools import partial, wraps
-from typing import Any, Generic, List, Literal, ParamSpec, Protocol, TypeVar
+from typing import Any, Generic, Literal, ParamSpec, Protocol, TypeVar
 
 import pytest
 
@@ -417,6 +416,7 @@ class TestObjectName:
         def outer() -> None:
             def inner() -> None:
                 pass
+
             return inner
 
         assert object_name(outer(), full=False) == "inner"
@@ -426,8 +426,8 @@ class TestObjectName:
         assert object_name(ParamSpec("P"), full=False) == "P"
         assert object_name(Protocol) == "typing.Protocol"
         assert object_name(Generic) == "typing.Generic"
-        assert object_name(List) == "typing.List"
-        assert object_name(List[int]) == "typing.List"
+        assert object_name(list) == "typing.List"
+        assert object_name(list[int]) == "typing.List"
         assert object_name(Literal[1]) == "typing.Literal"
 
     def test_object_name_async_generator(self) -> None:

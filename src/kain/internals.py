@@ -33,7 +33,7 @@ from re import sub
 from sys import modules, stderr, stdin, stdout
 from sysconfig import get_paths
 from types import FunctionType, GenericAlias, LambdaType, ModuleType, UnionType
-from typing import Any, cast, get_args, get_origin
+from typing import Any, TypeVar, cast, get_args, get_origin, overload
 
 Collections: tuple[type, ...] = deque, dict, list, set, tuple, bytearray
 Primitives: tuple[type, ...] = bool, float, int, str, complex, bytes
@@ -225,7 +225,9 @@ def object_name(obj: Any, full: bool = True) -> str:
             return "typing.Any" if full else "Any"
 
         name: str = getattr(
-            x, "__qualname__", getattr(x, "__name__", str(x)),
+            x,
+            "__qualname__",
+            getattr(x, "__name__", str(x)),
         )
         module = get_module_from(x)
 
@@ -254,9 +256,8 @@ def object_name(obj: Any, full: bool = True) -> str:
                 return get_object_name(obj.fget)
             return get_object_name(cls)
 
-        if (
-            (hasattr(obj, "__qualname__") or hasattr(obj, "__name__"))
-            and (not isclass(obj) and not ismodule(obj))
+        if (hasattr(obj, "__qualname__") or hasattr(obj, "__name__")) and (
+            not isclass(obj) and not ismodule(obj)
         ):
             return get_object_name(obj)
 
@@ -301,7 +302,7 @@ def is_imported_module(name: str) -> bool:
     chunks = name.split(".")
     return (
         sum(".".join(chunks[: no + 1]) in modules for no in range(len(chunks)))
-        >= 2
+        >= 2  # noqa: PLR2004
     )
 
 
@@ -523,6 +524,56 @@ def to_bytes(x: bytes | str, /, charset: str | None = None) -> bytes:
     return x.encode(charset or "ascii")
 
 
+T = TypeVar("T")
+K = TypeVar("K")
+V = TypeVar("V")
+K_cmp = TypeVar("K_cmp")
+
+
+# Mapping без key — сравниваем по ключам, возвращаем пары (key, value)
+@overload
+def unique(
+    iterable: Mapping[K, V],
+    /,
+    key: None = None,
+    include: Iterable[K] | None = None,
+    exclude: Iterable[K] | None = None,
+) -> Iterator[tuple[K, V]]: ...
+
+
+# Mapping с key — ключи трансформируются для сравнения
+@overload
+def unique(
+    iterable: Mapping[K, V],
+    /,
+    key: Callable[[K], K_cmp],
+    include: Iterable[K_cmp] | None = None,
+    exclude: Iterable[K_cmp] | None = None,
+) -> Iterator[tuple[K, V]]: ...
+
+
+# Обычный Iterable без key
+@overload
+def unique(
+    iterable: Iterable[T],
+    /,
+    key: None = None,
+    include: Iterable[T] | None = None,
+    exclude: Iterable[T] | None = None,
+) -> Iterator[T]: ...
+
+
+# Обычный Iterable с key
+@overload
+def unique(
+    iterable: Iterable[T],
+    /,
+    key: Callable[[T], K_cmp],
+    include: Iterable[K_cmp] | None = None,
+    exclude: Iterable[K_cmp] | None = None,
+) -> Iterator[T]: ...
+
+
 def unique(
     iterable: Iterable[Any],
     /,
@@ -533,9 +584,8 @@ def unique(
     skip = include is None
 
     if not key:
-        exclude_set = set(exclude or ())
-        include_set = frozenset(include or ())
-
+        exclude_set: set[Any] = set(exclude or ())
+        include_set: frozenset[Any] = frozenset(include or ())
     else:
         exclude_set = set(map(key, exclude or ()))
         include_set = frozenset(map(key, include or ()))
@@ -544,11 +594,9 @@ def unique(
     included = include_set.__contains__
     is_dict = is_mapping(iterable)
 
-    for element in iterable:
-
-        k = key(element) if key else element
+    for element in iterable:  # type: ignore[attr-defined]
+        k = key(element) if key else element  # type: ignore[arg-type]
         if not excluded(k) and (skip or included(k)):
-
             yield (
                 (element, cast("Mapping[Any, Any]", iterable)[element])
                 if is_dict
