@@ -57,7 +57,9 @@ class OnSystemExit(metaclass=Singleton):
                 hook(exc_type, exc_value, traceback)
             except Exception as e:  # noqa: BLE001
                 warnings.warn(
-                    f"{Who(hook)}: {e!r}", RuntimeWarning, stacklevel=2,
+                    f"{Who(hook)}: {e!r}",
+                    RuntimeWarning,
+                    stacklevel=2,
                 )
 
         self.teardown()
@@ -78,7 +80,9 @@ class OnSystemExit(metaclass=Singleton):
             return
 
         self.exceptions_hooks_proxy(
-            args.exc_type, args.exc_value, args.exc_traceback,
+            args.exc_type,
+            args.exc_value,
+            args.exc_traceback,
         )
 
     def restore_original_handlers(self) -> None:
@@ -89,13 +93,11 @@ class OnSystemExit(metaclass=Singleton):
         sys.excepthook = self.original_hook
         threading.excepthook = threading.__excepthook__
 
-
     def schedule(self, func: Callable) -> None:
         self.callbacks.append(func)
 
     def add_hook(self, func: Callable) -> None:
         self.hooks_chain.append(func)
-
 
     def teardown(self) -> None:
         if self.already_called:
@@ -107,7 +109,9 @@ class OnSystemExit(metaclass=Singleton):
                     func()
                 except BaseException as e:  # noqa: BLE001
                     warnings.warn(
-                        f"{Who(func)}: {e!r}", RuntimeWarning, stacklevel=2,
+                        f"{Who(func)}: {e!r}",
+                        RuntimeWarning,
+                        stacklevel=2,
                     )
 
         finally:
@@ -144,7 +148,6 @@ def quit_at(
 
     initial_stamp = get_mtime()
 
-
     def on_change(*, sleep=0.0) -> bool:
 
         if NeedRestart and signal:
@@ -171,7 +174,6 @@ def quit_at(
             time.sleep(sleep)
 
         return True
-
 
     def sleep(wait: float = 0.0, /, poll=0.0) -> bool:
         if not wait:

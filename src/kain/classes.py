@@ -11,7 +11,6 @@ class Missing:
     def __hash__(self) -> int:
         return id(self)
 
-    @override
     def __bool__(self) -> bool:
         return False
 

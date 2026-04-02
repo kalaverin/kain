@@ -93,7 +93,10 @@ def parent_call(func):
             )
 
             return func(
-                node, extract_wrapped(desc)(node, *args, **kw), *args, **kw,
+                node,
+                extract_wrapped(desc)(node, *args, **kw),
+                *args,
+                **kw,
             )
 
         except RecursionError as e:
@@ -400,8 +403,6 @@ class PostCachedProperty(MixedProperty, Cached):
         return super().__set__(node, value)
 
 
-
-
 class pin(InsteadProperty):  # noqa: N801
 
     native = Cached
@@ -415,8 +416,6 @@ class class_property(ClassProperty): ...  # noqa: N801
 
 
 class mixed_property(MixedProperty): ...  # noqa: N801
-
-
 
 
 def proxy_to(  # noqa: PLR0915
