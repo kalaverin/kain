@@ -122,7 +122,16 @@ local-project = ["kain"]
   "A001"  # Variable `copyright` is shadowing a Python builtin
 ]
 "src/*" = []
-"tests/*" = []
+"tests/*" = [
+  "ANN001",  # Missing type annotation for function argument `mock_workflow_is_replaying`
+  "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in `key`
+  "ARG002",  # Unused method argument: `mock_workflow_info`
+  "FBT003",  # Boolean positional value in function call
+  "INP001",  # File `tests/workflows/test_turnover_workflows.py` is part of an implicit namespace package. Add an `__init__.py`.
+  "PLC0415",  # `import` should be at the top-level of a file
+  "PLR2004",  # Magic value used in comparison, consider replacing `3` with a constant variable
+  "S101"  # Use of `assert` detected
+]
 
 [tool.setuptools]
 packages = ["kain"]

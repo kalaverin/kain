@@ -8,8 +8,11 @@ target-version = "py312"
 
 [lint]
 ignore = [
+  "EM102",  # Exception must not use an f-string literal, assign to variable first
   "FIX002",  # Line contains TODO, consider resolving the issue
-  "TD003"  # Missing issue link for this TODO
+  "G004",  # Logging statement uses f-string
+  "TD003",  # Missing issue link for this TODO
+  "TRY003"  # Avoid specifying long messages outside the exception class
 ]
 # we always enable all checks
 select = [

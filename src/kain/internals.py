@@ -1,6 +1,15 @@
+# ruff: noqa: ANN401, FBT001, FBT002
+
 import sys
 from collections import deque
-from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
+from collections.abc import (
+    Callable,
+    Collection,
+    Iterable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
 from contextlib import suppress
 from dataclasses import dataclass
 from functools import cache, partial
@@ -23,14 +32,14 @@ from platform import architecture
 from re import sub
 from sys import modules, stderr, stdin, stdout
 from sysconfig import get_paths
-from types import FunctionType, LambdaType, UnionType
-from typing import Any, GenericAlias, get_args, get_origin
+from types import FunctionType, GenericAlias, LambdaType, ModuleType, UnionType
+from typing import Any, cast, get_args, get_origin
 
-Collections = deque, dict, list, set, tuple, bytearray
-Primitives = bool, float, int, str, complex, bytes
-Builtins = Primitives + Collections
+Collections: tuple[type, ...] = deque, dict, list, set, tuple, bytearray
+Primitives: tuple[type, ...] = bool, float, int, str, complex, bytes
+Builtins: tuple[type, ...] = Primitives + Collections
 
-WinNT = "windows" in architecture()[1].lower()
+WinNT: bool = "windows" in architecture()[1].lower()
 
 __all__ = (
     "Is",
@@ -50,7 +59,7 @@ def class_of(obj: Any) -> type[Any]:
 
 
 def is_callable(obj: Any) -> bool:
-    return isinstance(obj, Callable) or callable(obj)
+    return isinstance(obj, Callable) or callable(obj)  # type: ignore[arg-type]
 
 
 def is_collection(obj: Any) -> bool:
@@ -137,14 +146,18 @@ def is_internal(x: Any) -> bool:
         if module.__name__ == "builtins":
             return True
 
-        is_stdlib = _get_module_path_type(module.__file__)[0]
+        file_path = getattr(module, "__file__", None)
+        if file_path is None:
+            return True
+
+        is_stdlib = _get_module_path_type(file_path)[0]
         if is_stdlib is not None:
             return is_stdlib
 
     return False
 
 
-def is_subclass(obj: Any, types) -> bool:  # noqa: PLR0911
+def is_subclass(obj: Any, types: Any) -> bool:  # noqa: PLR0911
     if types is None:
         return False
 
@@ -178,30 +191,36 @@ def is_subclass(obj: Any, types) -> bool:  # noqa: PLR0911
     return issubclass(cls, types)
 
 
-def get_module(x: Any):
+def get_module(x: Any) -> ModuleType | None:
     if ismodule(x):
         return x
 
     if (module := getmodule(x)) or (module := getmodule(class_of(x))):
         return module
 
+    return None
+
 
 def get_module_name(x: Any) -> str | None:
     if module := get_module(x):
         with suppress(AttributeError):
-            return module.__spec__.name
+            if spec := module.__spec__:
+                return spec.name
+    return None
 
 
-def object_name(obj: Any, full=True) -> str:
-    def post(x):
+def object_name(obj: Any, full: bool = True) -> str:
+    def post(x: str) -> str:
         return sub(
-            r"^([\?\.]+)", "", sub("^(__main__|__builtin__|builtins)", "", x),
+            r"^([\?\.]+)",
+            "",
+            sub("^(__main__|__builtin__|builtins)", "", x),
         )
 
-    def get_module_from(x):
+    def get_module_from(x: Any) -> str:
         return getattr(x, "__module__", get_module_name(x)) or "?"
 
-    def get_object_name(x: Any):
+    def get_object_name(x: Any) -> str:
         if obj is Any:
             return "typing.Any" if full else "Any"
 
@@ -212,15 +231,19 @@ def object_name(obj: Any, full=True) -> str:
             name = f"{module}.{name}"
         return name
 
-    def main(obj: Any):
+    def main(obj: Any) -> str:
         if ismodule(obj):
-            return get_module_name(obj)
+            return get_module_name(obj) or "?"
 
         for itis in iscoroutine, isfunction, ismethod:
             if itis(obj):
                 name = get_object_name(obj)
                 with suppress(AttributeError):
-                    name = f"{object_name(obj.im_self or obj.im_class)}.{post(name)}"
+                    self_or_cls = (
+                        obj.im_self  # type: ignore[attr-defined]
+                        or obj.im_class  # type: ignore[attr-defined]
+                    )
+                    name = f"{object_name(self_or_cls)}.{post(name)}"
                 return name
 
         cls = class_of(obj)
@@ -237,25 +260,26 @@ def pretty_module(obj: Any) -> str:
     return who_is(obj).rsplit(".", 1)[0]
 
 
-def source_file(obj: Any, template=None, **kw) -> str:
+def source_file(
+    obj: Any,
+    template: str | None = None,
+    **kw: Any,
+) -> str | None:
     kw.setdefault("exclude_self", False)
     kw.setdefault("exclude_stdlib", False)
 
     for child in iter_inheritance(class_of(obj), **kw):
-        try:
+        with suppress(TypeError):
             if path := getsourcefile(child):
                 return (template % path) if template else str(path)
-        except TypeError:
-            ...
+    return None
 
 
-def just_value(obj: Any, /, **kw) -> str:
+def just_value(obj: Any, /, **kw: Any) -> str:
     kw.setdefault("addr", False)
-
     name = who_is(obj, **kw)
-    if isclass(obj):
-        return f"({name})"
-    return f"({name}){obj}"
+
+    return f"({name})" if isclass(obj) else f"({name}){obj}"
 
 
 @cache
@@ -271,22 +295,23 @@ def is_imported_module(name: str) -> bool:
     )
 
 
-def get_mro(obj, /, **kw):
+def get_mro(obj: Any, /, **kw: Any) -> tuple[Any, ...] | str:
 
-    func: Any = kw.pop("func", None)
-    glue: Any = kw.pop("glue", None)
+    func: Callable[[Any], Any] | None = kw.pop("func", None)
+    glue: str | None = kw.pop("glue", None)
 
     result = iter_inheritance(obj, **kw)
 
     if func:
-        result: tuple[Any, ...] = tuple(map(func, result))
+        mapped = tuple(map(func, result))
+        if glue:
+            return glue.join(mapped)
+        return mapped
 
     if glue:
         return glue.join(result)
 
-    return result if func else tuple(result)
-
-
+    return tuple(result)
 
 
 def simple_repr(x: Any) -> bool | str | None:
@@ -299,11 +324,11 @@ def simple_repr(x: Any) -> bool | str | None:
     return just_value(x)
 
 
-def format_args_and_keywords(*args, **kw) -> str:
-    def format_args(x):
+def format_args_and_keywords(*args: Any, **kw: Any) -> str:
+    def format_args(x: tuple[Any, ...]) -> str:
         return repr(tuple(map(simple_repr, x)))[1:-1].rstrip(",")
 
-    def format_kwargs(x):
+    def format_kwargs(x: dict[str, Any]) -> str:
         return ", ".join(f"{k}={simple_repr(v)}" for k, v in x.items())
 
     if args and kw:
@@ -321,7 +346,7 @@ def format_args_and_keywords(*args, **kw) -> str:
 # public interface, Is/Who
 
 
-def who_is(obj: Any, /, full=True, addr=False) -> str:
+def who_is(obj: Any, /, full: bool = True, addr: bool = False) -> str:
     key = "__name_full__" if full else "__name_short__"
 
     def get_name() -> str:
@@ -348,65 +373,64 @@ def who_is(obj: Any, /, full=True, addr=False) -> str:
 class Who:
     Args: Callable[..., str] = format_args_and_keywords
     Cast: Callable[..., str] = just_value
-    File: Callable[..., str] = source_file
-    Inheritance: Callable[..., Any] = get_mro
+    File: Callable[..., str | None] = source_file
+    Inheritance: Callable[..., tuple[Any, ...] | str] = get_mro
     Is: Callable[..., str] = who_is
     Module: Callable[..., str] = pretty_module
-    Addr: partial[str] = partial(who_is, addr=True)
-    Name: partial[str] = partial(who_is, full=False)
-
-
+    Addr: partial[str] = partial(who_is, addr=True)  # noqa: RUF009
+    Name: partial[str] = partial(who_is, full=False)  # noqa: RUF009
 
 
 @dataclass
 class Is:
     Builtin: Callable[..., bool] = is_from_builtin
-    Class: Callable[..., type[type[Any]]] = isclass
+    Class: Callable[..., Any] = isclass
 
-    Primivite: Callable = is_from_primivite
+    Primivite: Callable[..., bool] = is_from_primivite
     tty: bool = is_interactive()
-    awaitable: Callable = isawaitable
-    builtin: Callable = isbuiltin
-    callable: Callable = is_callable
-    classOf = class_of
-    collection: Callable = is_collection
-    coroutine: Callable = iscoroutine
-    function: Callable = isfunction
-    imported: Callable = is_imported_module
-    internal: Callable = is_internal
-    iterable: Callable = is_iterable
-    mapping: Callable = is_mapping
-    method: Callable = ismethod
-    module: Callable = ismodule
-    primitive: Callable = is_primitive
-    subclass: Callable = is_subclass
+    awaitable: Callable[..., bool] = isawaitable
+    builtin: Callable[..., bool] = isbuiltin
+    callable: Callable[..., bool] = is_callable
+    classOf: Callable[..., type[Any]] = class_of  # noqa: N815
+    collection: Callable[..., bool] = is_collection
+    coroutine: Callable[..., bool] = iscoroutine
+    function: Callable[..., bool] = isfunction
+    imported: Callable[..., bool] = is_imported_module
+    internal: Callable[..., bool] = is_internal
+    iterable: Callable[..., bool] = is_iterable
+    mapping: Callable[..., bool] = is_mapping
+    method: Callable[..., bool] = ismethod
+    module: Callable[..., bool] = ismodule
+    primitive: Callable[..., bool] = is_primitive
+    subclass: Callable[..., bool] = is_subclass
 
 
 # public functions
 
 
-def iter_stack(*args, **kw):
+def iter_stack(*args: Any, **kw: Any) -> Iterator[Any]:
     result = stack()[kw.pop("offset", 0) :]
     yield from (map(itemgetter(*args), result) if args else result)
 
 
 def iter_inheritance(  # noqa: PLR0913
     obj: Any,
-    include=None,
-    exclude=None,
-    exclude_self=True,
-    exclude_stdlib=True,
-    reverse=False,
-):
-    order = class_of(obj).__mro__[:-1]
+    include: Any = None,
+    exclude: Any = None,
+    exclude_self: bool = True,
+    exclude_stdlib: bool = True,
+    reverse: bool = False,
+) -> Iterator[Any]:
+    order: Iterator[Any]
+    mro = class_of(obj).__mro__[:-1]
 
     if not exclude_self:
-        order = unique((obj, *order), key=id)
+        order = unique((obj, *mro), key=id)
     else:
-        order = unique(filter(lambda x: x is not obj, order), key=id)
+        order = unique(filter(lambda x: x is not obj, mro), key=id)
 
     if reverse:
-        order = reversed(list(order))
+        order = iter(reversed(list(order)))
 
     if include:
         if isinstance(include, FunctionType | LambdaType):
@@ -431,10 +455,12 @@ def iter_inheritance(  # noqa: PLR0913
 
 
 def _get_attribute_from_inheritance(
-    obj: Any, name: str, **kw,
+    obj: Any,
+    name: str,
+    **kw: Any,
 ) -> tuple[Any, Any]:
 
-    index = kw.pop("index", 0)
+    index: int = kw.pop("index", 0)
     kw.setdefault("exclude_self", False)
     kw.setdefault("exclude_stdlib", False)
 
@@ -453,22 +479,22 @@ def _get_attribute_from_inheritance(
     raise KeyError(name)
 
 
-def get_owner(obj: Any, name: str, **kw) -> Any:
+def get_owner(obj: Any, name: str, **kw: Any) -> Any | None:
     with suppress(KeyError):
         return _get_attribute_from_inheritance(obj, name, **kw)[1]
+    return None
 
 
-def get_attr(obj: Any, name: str, default: Any = None, **kw) -> Any:
+def get_attr(obj: Any, name: str, default: Any = None, **kw: Any) -> Any:
     try:
         return _get_attribute_from_inheritance(obj, name, **kw)[0]
     except KeyError:
         return default
 
 
-def to_ascii(x: str, /, charset: str | None = None) -> str:
+def to_ascii(x: bytes | str, /, charset: str | None = None) -> str:
     if not isinstance(x, bytes | str):
-        msg = f"only bytes | str acceptable, not {just_value(x)}"
-        raise TypeError(msg)
+        raise TypeError(f"only bytes | str acceptable, not {just_value(x)}")
 
     if isinstance(x, str):
         return x
@@ -477,10 +503,9 @@ def to_ascii(x: str, /, charset: str | None = None) -> str:
     return to_bytes(x, charset=charset).decode(charset)
 
 
-def to_bytes(x: str, /, charset: str | None = None) -> bytes:
+def to_bytes(x: bytes | str, /, charset: str | None = None) -> bytes:
     if not isinstance(x, bytes | str):
-        msg = f"only bytes | str acceptable, not {just_value(x)}"
-        raise TypeError(msg)
+        raise TypeError(f"only bytes | str acceptable, not {just_value(x)}")
 
     if not isinstance(x, str):
         return x
@@ -488,19 +513,25 @@ def to_bytes(x: str, /, charset: str | None = None) -> bytes:
     return x.encode(charset or "ascii")
 
 
-def unique(iterable, /, key=None, include=None, exclude=None):
+def unique(
+    iterable: Iterable[Any],
+    /,
+    key: Callable[[Any], Any] | None = None,
+    include: Iterable[Any] | None = None,
+    exclude: Iterable[Any] | None = None,
+) -> Iterator[Any]:
     skip = include is None
 
     if not key:
-        exclude = set(exclude or ())
-        include = frozenset(include or ())
+        exclude_set = set(exclude or ())
+        include_set = frozenset(include or ())
 
     else:
-        exclude = set(map(key, exclude or ()))
-        include = frozenset(map(key, include or ()))
+        exclude_set = set(map(key, exclude or ()))
+        include_set = frozenset(map(key, include or ()))
 
-    excluded = exclude.__contains__
-    included = include.__contains__
+    excluded = exclude_set.__contains__
+    included = include_set.__contains__
     is_dict = is_mapping(iterable)
 
     for element in iterable:
@@ -508,5 +539,9 @@ def unique(iterable, /, key=None, include=None, exclude=None):
         k = key(element) if key else element
         if not excluded(k) and (skip or included(k)):
 
-            yield (element, iterable[element]) if is_dict else element
-            exclude.add(k)
+            yield (
+                (element, cast("Mapping[Any, Any]", iterable)[element])
+                if is_dict
+                else element
+            )
+            exclude_set.add(k)
