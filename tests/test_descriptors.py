@@ -42,9 +42,7 @@ class TestPin:
             def prop(self) -> int:
                 return 42
 
-        # NOTE: Current implementation raises TypeError due to a known
-        # issue with Who(...) usage inside error formatting.
-        with pytest.raises(TypeError):
+        with pytest.raises(ContextFaultError):
             Foo.prop
 
     def test_delete_raises(self) -> None:
@@ -55,9 +53,7 @@ class TestPin:
 
         obj = Foo()
         assert obj.prop == 42
-        # NOTE: Current implementation raises TypeError due to a known
-        # issue with Who(...) usage inside error formatting.
-        with pytest.raises(TypeError):
+        with pytest.raises(ReadOnlyError):
             del obj.prop
 
     def test_rejects_async(self) -> None:
