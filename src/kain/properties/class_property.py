@@ -1,4 +1,6 @@
+from asyncio import ensure_future
 from functools import cached_property
+from inspect import iscoroutinefunction
 from typing import ClassVar, override
 
 from kain.internals import Is, Who, get_owner
@@ -36,7 +38,10 @@ class class_property(BaseProperty):
     def call(self, node: object) -> object:
         self.get_node(node)
         try:
-            return self.function(node)
+            value = self.function(node)
+            if iscoroutinefunction(self.function):
+                return ensure_future(value)
+            return value
 
         except AttributeError as e:
             raise AttributeException(e) from e
@@ -66,7 +71,10 @@ class mixed_property(BaseProperty):
     def call(self, node: object) -> object:
         self.get_node(node)
         try:
-            return self.function(node)
+            value = self.function(node)
+            if iscoroutinefunction(self.function):
+                return ensure_future(value)
+            return value
 
         except AttributeError as e:
             raise AttributeException(e) from e

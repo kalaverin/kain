@@ -196,7 +196,7 @@ class bound_property(BaseProperty):
     def header_with_context(self, node: object) -> str:
         return self.footer(node)
 
-    def __get__(self, node: object, klass: object) -> object:
+    def __get__(self, node: object, klass: object = Nothing) -> object:
         if node is None:
             raise ContextFaultError(self.header_with_context(klass))
 

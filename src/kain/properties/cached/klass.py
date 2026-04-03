@@ -1,5 +1,8 @@
+from asyncio import ensure_future
+from collections.abc import Callable
 from contextlib import suppress
 from functools import cached_property, partial
+from inspect import iscoroutinefunction
 from time import time
 from typing import override
 
@@ -21,28 +24,35 @@ __all__ = (
 class CustomCallbackMixin:
 
     @classmethod
-    def expired_by(cls, callback):
+    def by(cls, callback):
         return partial(cls, is_actual=callback)
+
+    expired_by = by
 
     @classmethod
     def ttl(cls, expire: float):
+
+        if not isinstance(expire, float | int):
+            msg = f"expire must be float or int, not {Who.Cast(expire)}"
+            raise TypeError(msg)
 
         if expire <= 0:
             msg = f"expire must be positive number, not {Who.Cast(expire)}"
             raise ValueError(msg)
 
         def is_actual(
-            *_: object,
+            _self: object,
+            _node: object,
             value: float | Missing = Nothing,
         ) -> bool | float:
             if isinstance(value, float):
                 return value + expire > time()
             return time()
 
-        return cls.expired_by(is_actual)
+        return cls.by(is_actual)
 
 
-class class_parent_cached_property(BaseProperty):
+class class_parent_cached_property(BaseProperty, CustomCallbackMixin):
 
     @cached_property
     def title(self) -> str:
@@ -98,6 +108,8 @@ class class_parent_cached_property(BaseProperty):
 
         try:
             value = self.function(node)
+            if iscoroutinefunction(self.function):
+                value = ensure_future(value)
 
         except AttributeError as e:
             raise AttributeException(e) from e

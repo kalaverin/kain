@@ -35,7 +35,7 @@ __all__ = (
 
 class pin(bound_property):
     native = cached_property
-    cls = class_property
-    any = mixed_property
+    cls = class_cached_property
+    any = mixed_cached_property
     pre = pre_cached_property
     post = post_cached_property

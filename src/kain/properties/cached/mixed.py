@@ -1,6 +1,6 @@
 from contextlib import suppress
 from functools import cached_property
-from typing import ClassVar, override
+from typing import override
 
 from kain.internals import Is, Who, get_owner
 from kain.properties.cached.klass import (
@@ -49,6 +49,7 @@ class mixed_parent_cached_property(class_parent_cached_property):
 
 
 class mixed_cached_property(mixed_parent_cached_property):
+
     @override
     def get_node(self, node: object) -> object:
         if node is None:
