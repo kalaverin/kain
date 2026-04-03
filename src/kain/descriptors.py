@@ -4,7 +4,6 @@ from contextlib import suppress
 from functools import cached_property, lru_cache, partial, wraps
 from inspect import iscoroutine, isfunction, ismethod
 from logging import getLogger
-from operator import attrgetter
 from time import time
 from typing import Any
 
@@ -423,12 +422,3 @@ class class_property(ClassProperty): ...  # noqa: N801
 
 
 class mixed_property(MixedProperty): ...  # noqa: N801
-
-
-def proxy_to(
-    *mapping,
-    getter=attrgetter,
-    default=Nothing,
-    pre=None,
-    safe=True,
-): ...
