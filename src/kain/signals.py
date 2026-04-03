@@ -6,6 +6,7 @@ import time
 import warnings
 from collections.abc import Callable
 from datetime import datetime
+from functools import cache
 from logging import getLogger
 from pathlib import Path
 from signal import signal as bind
@@ -13,7 +14,6 @@ from types import FrameType, TracebackType
 from typing import Any, Protocol
 
 from kain.classes import Singleton
-from kain.descriptors import cache
 from kain.internals import Who
 
 __all__ = (

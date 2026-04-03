@@ -36,10 +36,16 @@ from types import FunctionType, GenericAlias, LambdaType, ModuleType, UnionType
 from typing import Any, TypeVar, cast, get_args, get_origin, overload
 
 Collections: tuple[type, ...] = deque, dict, list, set, tuple, bytearray
+"""Built-in mutable and immutable collection types."""
+
 Primitives: tuple[type, ...] = bool, float, int, str, complex, bytes
+"""Primitive scalar types."""
+
 Builtins: tuple[type, ...] = Primitives + Collections
+"""All built-in primitive and collection types."""
 
 WinNT: bool = "windows" in architecture()[1].lower()
+"""True when running on a Windows NT platform."""
 
 __all__ = (
     "Is",
@@ -55,14 +61,25 @@ __all__ = (
 
 
 def class_of(obj: Any) -> type[Any]:
+    """Return the class of *obj*.
+
+    If *obj* is already a class, it is returned unchanged.
+    """
     return obj if isclass(obj) else type(obj)
 
 
 def is_callable(obj: Any) -> bool:
+    """Return whether *obj* is callable."""
     return isinstance(obj, Callable) or callable(obj)  # type: ignore[arg-type]
 
 
 def is_collection(obj: Any) -> bool:
+    """Return whether *obj* looks like a collection.
+
+    Sequences (except ``str``/``bytes``), mappings, and duck-typed
+    objects implementing ``__getitem__``, ``__setitem__`` and
+    ``__delitem__`` are considered collections.
+    """
     return (
         (
             isinstance(obj, Collection)
@@ -80,26 +97,32 @@ def is_collection(obj: Any) -> bool:
 
 
 def is_iterable(obj: Any) -> bool:
+    """Return whether *obj* is iterable."""
     return isinstance(obj, Iterable) or hasattr(obj, "__iter__")
 
 
 def is_mapping(obj: Any) -> bool:
+    """Return whether *obj* is a mapping."""
     return isinstance(obj, Mapping) or issubclass(class_of(obj), dict)
 
 
 def is_primitive(obj: Any) -> bool:
+    """Return whether *obj* is a primitive or built-in container."""
     return obj is True or obj is False or obj is None or type(obj) in Builtins
 
 
 def is_from_primivite(obj: Any) -> bool:
+    """Return whether *obj* is ``None`` or a primitive instance."""
     return bool(obj is None or isinstance(obj, Primitives))
 
 
 def is_from_builtin(obj: Any) -> bool:
+    """Return whether *obj* is ``None`` or a built-in instance."""
     return bool(isinstance(obj, Collections) or is_from_primivite(obj))
 
 
 def is_interactive() -> bool:
+    """Return whether the current session is attached to a TTY."""
     if not getattr(sys, "frozen", False):  # nuitka compiler checks this
         return all(map(methodcaller("isatty"), (stderr, stdin, stdout)))
     return False
@@ -107,6 +130,13 @@ def is_interactive() -> bool:
 
 @cache
 def _get_module_path_type(full: Any) -> tuple[bool | None, str]:
+    """Categorise *full* as stdlib, local project, or external.
+
+    Returns a ``(is_stdlib, relative_or_full_path)`` tuple where
+    ``is_stdlib`` is ``True`` for the standard library, ``False`` for
+    the current project or site-packages, and ``None`` for unknown
+    paths.
+    """
     dirs = get_paths()
 
     path = str(full)
@@ -138,6 +168,7 @@ def _get_module_path_type(full: Any) -> tuple[bool | None, str]:
 
 
 def is_internal(x: Any) -> bool:
+    """Return whether *x* originates from the standard library."""
     if isbuiltin(x) or isbuiltin(class_of(x)):
         return True
 
@@ -158,6 +189,11 @@ def is_internal(x: Any) -> bool:
 
 
 def is_subclass(obj: Any, types: Any) -> bool:  # noqa: PLR0911
+    """Extended subclass check supporting typing constructs.
+
+    Handles ``Any``, ``UnionType``, ``GenericAlias``, and plain
+    classes.  Returns ``False`` when *types* is ``None``.
+    """
     if types is None:
         return False
 
@@ -192,6 +228,7 @@ def is_subclass(obj: Any, types: Any) -> bool:  # noqa: PLR0911
 
 
 def get_module(x: Any) -> ModuleType | None:
+    """Resolve the module that defines *x*."""
     if ismodule(x):
         return x
 
@@ -202,6 +239,7 @@ def get_module(x: Any) -> ModuleType | None:
 
 
 def get_module_name(x: Any) -> str | None:
+    """Return the dotted module name for *x*."""
     if module := get_module(x):
         with suppress(AttributeError):
             if spec := module.__spec__:
@@ -210,6 +248,7 @@ def get_module_name(x: Any) -> str | None:
 
 
 def object_name(obj: Any, full: bool = True) -> str:
+    """Build a readable, fully-qualified name for *obj*."""
     def post(x: str) -> str:
         return sub(
             r"^([\?\.]+)",
@@ -268,6 +307,7 @@ def object_name(obj: Any, full: bool = True) -> str:
 
 
 def pretty_module(obj: Any) -> str:
+    """Return the module portion of *obj*'s fully-qualified name."""
     return who_is(obj).rsplit(".", 1)[0]
 
 
@@ -276,6 +316,7 @@ def source_file(
     template: str | None = None,
     **kw: Any,
 ) -> str | None:
+    """Locate the source file of *obj*'s class through inheritance."""
     kw.setdefault("exclude_self", False)
     kw.setdefault("exclude_stdlib", False)
 
@@ -287,6 +328,7 @@ def source_file(
 
 
 def just_value(obj: Any, /, **kw: Any) -> str:
+    """Return a short ``(Type)value`` representation of *obj*."""
     kw.setdefault("addr", False)
     name = who_is(obj, **kw)
 
@@ -295,7 +337,9 @@ def just_value(obj: Any, /, **kw: Any) -> str:
 
 @cache
 def is_imported_module(name: str) -> bool:
-
+    """Return whether *name* (or its parent package) is in
+    ``sys.modules``.
+    """
     with suppress(KeyError):
         return bool(modules[name])
 
@@ -307,7 +351,11 @@ def is_imported_module(name: str) -> bool:
 
 
 def get_mro(obj: Any, /, **kw: Any) -> tuple[Any, ...] | str:
+    """Walk the inheritance chain of *obj* with optional mapping.
 
+    Accepts ``func`` to transform each class and ``glue`` to join
+    the result into a string.
+    """
     func: Callable[[Any], Any] | None = kw.pop("func", None)
     glue: str | None = kw.pop("glue", None)
 
@@ -326,6 +374,11 @@ def get_mro(obj: Any, /, **kw: Any) -> tuple[Any, ...] | str:
 
 
 def simple_repr(x: Any) -> bool | str | None:
+    """Return a plain Python literal when possible.
+
+    Falls back to a type description via :func:`just_value` for
+    complex objects.
+    """
     if (x is None or x is True or x is False) or isinstance(x, str):
         return x
 
@@ -336,6 +389,7 @@ def simple_repr(x: Any) -> bool | str | None:
 
 
 def format_args_and_keywords(*args: Any, **kw: Any) -> str:
+    """Pretty-print positional and keyword arguments."""
     def format_args(x: tuple[Any, ...]) -> str:
         return repr(tuple(map(simple_repr, x)))[1:-1].rstrip(",")
 
@@ -358,6 +412,11 @@ def format_args_and_keywords(*args: Any, **kw: Any) -> str:
 
 
 def who_is(obj: Any, /, full: bool = True, addr: bool = False) -> str:
+    """Return the fully-qualified name of *obj*.
+
+    Caches the result on the object itself.  When *addr* is ``True``,
+    appends the ``id()`` in hex.
+    """
     key = "__name_full__" if full else "__name_short__"
 
     def get_name() -> str:
@@ -382,6 +441,8 @@ def who_is(obj: Any, /, full: bool = True, addr: bool = False) -> str:
 
 @dataclass
 class Who:
+    """Namespace holding introspection helpers."""
+
     Args: Callable[..., str] = format_args_and_keywords
     Cast: Callable[..., str] = just_value
     File: Callable[..., str | None] = source_file
@@ -394,6 +455,8 @@ class Who:
 
 @dataclass
 class Is:
+    """Namespace holding type-check predicates."""
+
     Builtin: Callable[..., bool] = is_from_builtin
     Class: Callable[..., Any] = isclass
 
@@ -420,6 +483,11 @@ class Is:
 
 
 def iter_stack(*args: Any, **kw: Any) -> Iterator[Any]:
+    """Yield frames from the current call stack.
+
+    *args* are attribute names extracted from each frame.
+    *offset* skips the first *n* frames.
+    """
     result = stack()[kw.pop("offset", 0) :]
     yield from (map(itemgetter(*args), result) if args else result)
 
@@ -432,6 +500,7 @@ def iter_inheritance(  # noqa: PLR0913
     exclude_stdlib: bool = True,
     reverse: bool = False,
 ) -> Iterator[Any]:
+    """Yield the MRO of *obj*'s class with configurable filtering."""
     order: Iterator[Any]
     mro = class_of(obj).__mro__[:-1]
 
@@ -470,7 +539,10 @@ def _get_attribute_from_inheritance(
     name: str,
     **kw: Any,
 ) -> tuple[Any, Any]:
+    """Locate *name* along the inheritance chain.
 
+    Returns ``(attribute, owner)``.  *index* selects the n-th match.
+    """
     index: int = kw.pop("index", 0)
     kw.setdefault("exclude_self", False)
     kw.setdefault("exclude_stdlib", False)
@@ -491,12 +563,17 @@ def _get_attribute_from_inheritance(
 
 
 def get_owner(obj: Any, name: str, **kw: Any) -> Any | None:
+    """Return the class that owns *name* in *obj*'s MRO."""
     with suppress(KeyError):
         return _get_attribute_from_inheritance(obj, name, **kw)[1]
     return None
 
 
 def get_attr(obj: Any, name: str, default: Any = None, **kw: Any) -> Any:
+    """Fetch *name* from *obj*'s inheritance chain.
+
+    Falls back to *default* when the attribute is missing.
+    """
     try:
         return _get_attribute_from_inheritance(obj, name, **kw)[0]
     except KeyError:
@@ -504,6 +581,7 @@ def get_attr(obj: Any, name: str, default: Any = None, **kw: Any) -> Any:
 
 
 def to_ascii(x: bytes | str, /, charset: str | None = None) -> str:
+    """Coerce *x* to a ``str`` using the given *charset*."""
     if not isinstance(x, bytes | str):
         raise TypeError(f"only bytes | str acceptable, not {just_value(x)}")
 
@@ -515,6 +593,7 @@ def to_ascii(x: bytes | str, /, charset: str | None = None) -> str:
 
 
 def to_bytes(x: bytes | str, /, charset: str | None = None) -> bytes:
+    """Coerce *x* to ``bytes`` using the given *charset*."""
     if not isinstance(x, bytes | str):
         raise TypeError(f"only bytes | str acceptable, not {just_value(x)}")
 
@@ -581,6 +660,11 @@ def unique(
     include: Iterable[Any] | None = None,
     exclude: Iterable[Any] | None = None,
 ) -> Iterator[Any]:
+    """Yield unique elements from *iterable* based on an optional *key*.
+
+    For mappings yields ``(key, value)`` pairs.  Already-seen keys
+    (or elements when *key* is omitted) are skipped.
+    """
     skip = include is None
 
     if not key:
