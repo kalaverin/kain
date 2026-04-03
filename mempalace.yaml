@@ -1,0 +1,10 @@
+wing: kain
+rooms:
+- name: testing
+  description: Files from tests/
+- name: etc
+  description: Files from etc/
+- name: src
+  description: Files from src/
+- name: general
+  description: Files that don't fit other rooms

@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from functools import partial
 from operator import itemgetter
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from kain.classes import Missing, Nothing
+from kain.classes import Nothing
 from kain.properties import proxy_to
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class Inner:
@@ -86,7 +89,7 @@ class TestProxyToBindModes:
         class Descriptor:
             pass
 
-        Descriptor.dynamic = lambda self: "dynamic"  # type: ignore[attr-defined]
+        Descriptor.dynamic = lambda _self: "dynamic"  # type: ignore[attr-defined]
 
         @proxy_to("desc", "dynamic", None)
         class Wrapper:
@@ -96,9 +99,10 @@ class TestProxyToBindModes:
         assert obj.dynamic() == "dynamic"
 
     def test_custom_bind_callable(self) -> None:
-        def custom_bind(func):
-            def wrapper(node):
+        def custom_bind(func: Callable[[Any], Any]) -> Callable[[Any], str]:
+            def wrapper(node: Any) -> str:
                 return f"wrap:{func(node)}"
+
             return wrapper
 
         @proxy_to("inner", "value", custom_bind)
@@ -151,6 +155,7 @@ class TestProxyToSafeMode:
 
     def test_safe_true_blocks_existing_attributes(self) -> None:
         with pytest.raises(TypeError, match="already exists"):
+
             @proxy_to("inner", "foo")
             class Wrapper:
                 def __init__(self) -> None:
@@ -201,7 +206,7 @@ class TestProxyToDefaults:
 
         obj = Wrapper()
         with pytest.raises(AttributeError, match="is None"):
-            obj.foo
+            _ = obj.foo
 
     def test_default_returns_fallback_when_pivot_is_none(self) -> None:
         @proxy_to("inner", "foo", default="fallback")
@@ -219,8 +224,8 @@ class TestProxyToDefaults:
                 self.inner = Inner()
 
         obj = Wrapper()
-        with pytest.raises(AttributeError, match="isn't exists"):
-            obj.missing
+        with pytest.raises(AttributeError, match="does not exist"):
+            _ = obj.missing
 
     def test_default_returns_fallback_when_attr_missing(self) -> None:
         @proxy_to("inner", "missing", default="fallback")
@@ -261,9 +266,10 @@ class TestProxyToGetter:
         assert obj.age == 30
 
     def test_custom_getter_callable(self) -> None:
-        def custom_getter(name: str):
+        def custom_getter(name: str) -> Callable[[Any], Any]:
             def fetch(entity: Any) -> Any:
                 return entity.get(name, "unknown")
+
             return fetch
 
         @proxy_to("data", "name", getter=custom_getter)
@@ -284,12 +290,14 @@ class TestProxyToValidation:
 
     def test_empty_mapping_list_raises(self) -> None:
         with pytest.raises(ValueError, match="empty"):
+
             @proxy_to("inner")
             class Wrapper:
                 pass
 
     def test_single_non_string_mapping_raises(self) -> None:
         with pytest.raises(ValueError, match="empty"):
+
             @proxy_to("inner", 123)
             class Wrapper:
                 pass
@@ -300,14 +308,17 @@ class TestProxyToValidation:
             pass
 
         obj = Wrapper()
-        with pytest.raises(AttributeError, match="isn't exists"):
+        with pytest.raises(AttributeError, match="does not exist"):
             obj.foo()
 
 
 class TestProxyToLogging:
     """Warning logs when default fallback is used."""
 
-    def test_logs_warning_when_pivot_is_none(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_logs_warning_when_pivot_is_none(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         import logging
 
         @proxy_to("inner", "foo", default="fallback")
@@ -322,7 +333,10 @@ class TestProxyToLogging:
         assert "is None" in caplog.text
         assert "return str" in caplog.text
 
-    def test_logs_warning_when_attr_missing(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_logs_warning_when_attr_missing(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         import logging
 
         @proxy_to("inner", "missing", default="fallback")
@@ -334,5 +348,5 @@ class TestProxyToLogging:
         with caplog.at_level(logging.WARNING):
             assert obj.missing == "fallback"
 
-        assert "isn't exists" in caplog.text
+        assert "does not exist" in caplog.text
         assert "return str" in caplog.text

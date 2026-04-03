@@ -9,10 +9,13 @@ is a coroutine function, the result is wrapped with
 :func:`asyncio.ensure_future` so the caller receives an awaitable.
 """
 
+from __future__ import annotations
+
 from asyncio import ensure_future
+from collections.abc import Awaitable, Callable
 from functools import cached_property
 from inspect import iscoroutinefunction
-from typing import ClassVar, override
+from typing import Any, Generic, TypeVar, overload, override
 
 from kain.internals import Is, Who, get_owner
 from kain.properties.primitives import (
@@ -26,8 +29,11 @@ __all__ = (
     "mixed_property",
 )
 
+T = TypeVar("T")
+R = TypeVar("R")
 
-class class_property(BaseProperty):
+
+class class_property(BaseProperty, Generic[T, R]):
     """Descriptor that calls ``function(klass)``.
 
     When the attribute is accessed as ``MyClass.attr`` *or*
@@ -43,17 +49,30 @@ class class_property(BaseProperty):
 
     # ``klass`` is used by error-formatting utilities to indicate that this
     # descriptor expects a class-like ``node``.
-    klass: ClassVar[bool | None] = True
+    klass: bool | None = True
+
+    @overload
+    def __new__(
+        cls,
+        function: Callable[[type[T]], R],
+    ) -> class_property[T, R]: ...
+    @overload
+    def __new__(cls, function: Callable[..., R]) -> class_property[Any, R]: ...
+    def __new__(cls, function: Callable[..., R]) -> class_property[Any, R]:
+        """Create a new class-property instance."""
+        return object.__new__(cls)
 
     @cached_property
     def title(self) -> str:
+        """Return a display title for this property."""
         return f"class descriptor {Who.Addr(self)}".strip()
 
     @override
     def header_with_context(self, node: object) -> str:
+        """Return a header string with owner context."""
         return self.footer(node)
 
-    def get_node(self, node: object) -> object:
+    def get_node(self, node: object) -> type[T]:
         """Validate that ``node`` is a class and return its owner.
 
         :func:`get_owner` walks the MRO to find the class that actually
@@ -64,9 +83,10 @@ class class_property(BaseProperty):
             msg = f"{self.header_with_context(node)}, {node=}"
             raise ContextFaultError(msg)
 
-        return get_owner(node, self.name)
+        result = get_owner(node, self.name)
+        return result if result is not None else node  # type: ignore[return-value]
 
-    def call(self, node: object) -> object:
+    def call(self, node: object) -> R | Awaitable[R]:
         """Invoke ``self.function(node)``, wrapping coroutines if needed."""
         self.get_node(node)
         try:
@@ -78,12 +98,20 @@ class class_property(BaseProperty):
         except AttributeError as e:
             raise AttributeException(e) from e
 
-    def __get__(self, instance: object, klass: object) -> object:
+    @overload
+    def __get__(self, instance: None, klass: type[T] | None = ...) -> R: ...
+    @overload
+    def __get__(self, instance: object, klass: type[T] | None = ...) -> R: ...
+    def __get__(
+        self,
+        instance: object | None,
+        klass: type[T] | None = None,
+    ) -> R:
         """Descriptor protocol hook — always delegates to ``call(klass)``."""
-        return self.call(klass)
+        return self.call(klass)  # type: ignore[return-value]
 
 
-class mixed_property(BaseProperty):
+class mixed_property(BaseProperty, Generic[T, R]):
     """Descriptor that calls ``function(instance_or_klass)``.
 
     A *mixed* property works on both instances and classes:
@@ -96,14 +124,24 @@ class mixed_property(BaseProperty):
     used to resolve the defining class when ``node`` is a class.
     """
 
-    klass: ClassVar[bool | None] = None
+    klass: bool | None = None
+
+    @overload
+    def __new__(cls, function: Callable[[T], R]) -> mixed_property[T, R]: ...
+    @overload
+    def __new__(cls, function: Callable[..., R]) -> mixed_property[Any, R]: ...
+    def __new__(cls, function: Callable[..., R]) -> mixed_property[Any, R]:
+        """Create a new mixed-property instance."""
+        return object.__new__(cls)
 
     @cached_property
     def title(self) -> str:
+        """Return a display title for this property."""
         return f"mixed descriptor {Who.Addr(self)}".strip()
 
     @override
     def header_with_context(self, node: object) -> str:
+        """Return a header string with owner context."""
         return self.footer(node, "mixed")
 
     def get_node(self, node: object) -> object:
@@ -113,7 +151,7 @@ class mixed_property(BaseProperty):
             raise ContextFaultError(msg)
         return get_owner(node, self.name) if Is.Class(node) else node
 
-    def call(self, node: object) -> object:
+    def call(self, node: object) -> R | Awaitable[R]:
         """Invoke ``self.function(node)``, wrapping coroutines if needed."""
         self.get_node(node)
         try:
@@ -125,6 +163,14 @@ class mixed_property(BaseProperty):
         except AttributeError as e:
             raise AttributeException(e) from e
 
-    def __get__(self, instance: object, klass: object) -> object:
+    @overload
+    def __get__(self, instance: None, klass: type[T] | None = ...) -> R: ...
+    @overload
+    def __get__(self, instance: T, klass: type[T] | None = ...) -> R: ...
+    def __get__(
+        self,
+        instance: object | None,
+        klass: type[T] | None = None,
+    ) -> R:
         """Descriptor protocol hook — delegates to ``call(instance or klass)``."""
-        return self.call(instance or klass)
+        return self.call(instance or klass)  # type: ignore[return-value]

@@ -38,17 +38,21 @@ class Missing:
 
     @override
     def __hash__(self) -> int:
+        """Return a hash based on object identity."""
         return id(self)
 
     def __bool__(self) -> bool:
+        """Always return False."""
         return False
 
     @override
     def __eq__(self, _: object) -> bool:
+        """Never equal to anything, including itself."""
         return False
 
     @override
     def __repr__(self) -> str:
+        """Return a descriptive representation with identity."""
         return f"<{Who.Name(self, addr=True)}>"
 
 
@@ -70,11 +74,13 @@ class Singleton(type):
         bases: tuple[type, ...],
         attributes: dict[str, object],
     ) -> None:
+        """Initialize singleton state."""
         cls.instance: object | Missing = Nothing
         super().__init__(name, bases, attributes)
 
     @override
     def __call__(cls, *args: object, **kw: object) -> object:
+        """Return the cached instance, creating it if necessary."""
         if cls.instance is Nothing:
             cls.instance = super().__call__(*args, **kw)
         return cls.instance

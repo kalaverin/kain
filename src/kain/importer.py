@@ -3,12 +3,12 @@
 This module provides utilities for:
 - Dynamic importing of modules, classes, functions, and attributes
 - Safe optional imports with fallback defaults
-- Path resolution and sys.path manipulation
+- Path resolution and ``sys.path`` manipulation
 
 The main functions are:
     - required(): Import with mandatory success or exception
     - optional(): Import with graceful fallback to default
-    - add_path(): Add resolved paths to sys.path
+    - add_path(): Add resolved paths to ``sys.path``
 
 Example:
     >>> from kain.importer import required, optional, add_path
@@ -92,7 +92,7 @@ def get_module(path: str) -> tuple[ModuleType, tuple[str, ...]]:
         with suppress(ModuleNotFoundError):
             return import_module(chunk), tuple(chunks[count - i :])
 
-    msg = f"ImportError: {path} ({chunk!a} isn't exists)"
+    msg = f"ImportError: {path} ({chunk!a} does not exist)"
     raise ImportError(msg)
 
 
@@ -162,10 +162,13 @@ def import_object(
     - Attributes from given parent objects
 
     Args:
-        path: The import path. Can be a string, bytes, or if ``something``
-            is provided, can be any object with the path as second argument.
-        something: Optional parent object. If provided, ``path`` is treated
-            as an attribute path relative to this object.
+        path: Can be a string or bytes. If ``something`` is provided and
+            ``path`` is not a string, the arguments are swapped so that
+            ``something`` is treated as the import path.
+        something: Optional parent object or import path string. If
+            ``path`` is a string, this is treated as the parent object. If
+            ``path`` is not a string, this is treated as the import path
+            string and the arguments are swapped.
 
     Returns:
         The imported object (module, class, function, etc.).
@@ -182,7 +185,7 @@ def import_object(
         <function join at ...>
     """
     if path is something is None:
-        raise TypeError("all arguments is None")
+        raise TypeError("all arguments are None")
 
     if isinstance(path, str | bytes):
         path = to_ascii(path)
@@ -226,17 +229,20 @@ def import_object(
 
 @cache
 def cached_import(*args: object, **kw: object) -> object:
-    """Cached version of :func:`import_object`.
+    """Cached version of ``import_object``.
 
     Uses :func:`functools.cache` to memoize import results. Subsequent
     calls with the same arguments return the cached result.
 
     Args:
-        *args: Positional arguments passed to :func:`import_object`.
-        **kw: Keyword arguments passed to :func:`import_object`.
+        *args: Positional arguments passed to ``import_object``.
+        **kw: Keyword arguments passed to ``import_object``.
 
     Returns:
         The imported (and cached) object.
+
+    Example:
+        >>> cached_import("os.path.join")
     """
     return import_object(*args, **kw)
 
@@ -245,17 +251,20 @@ def required(path: str, *args: object, **kw: object) -> object:
     """Import an object, requiring it to exist.
 
     Attempts to import the object at ``path``. If the import fails,
-    behavior is controlled by the ``throw`` and ``quiet`` parameters.
+    behavior is controlled by the ``throw``, ``quiet``, and ``default``
+    parameters.
 
     Args:
         path: The import path (e.g., ``os.path.join``).
-        *args: Additional positional arguments passed to import functions.
+        *args: Additional positional arguments passed to ``cached_import`` /
+            ``import_object``.
         throw: If True (default), raise ImportError on failure.
             If False, return ``default`` on failure.
         quiet: If True, suppress warning log on failure.
             If False (default), log a warning on failure.
         default: Value to return on failure when ``throw=False``.
-        **kw: Additional keyword arguments passed to import functions.
+        **kw: Additional keyword arguments passed to ``cached_import`` /
+            ``import_object``.
 
     Returns:
         The imported object, or ``default`` if import failed and
@@ -303,19 +312,22 @@ def required(path: str, *args: object, **kw: object) -> object:
 def optional(path: str, *args: object, **kw: object) -> object:
     """Import an object optionally, returning None on failure.
 
-    Convenience wrapper around :func:`required` with ``quiet=True``
+    Convenience wrapper around ``required`` with ``quiet=True``
     and ``throw=False`` by default.
 
     Args:
         path: The import path.
-        *args: Additional positional arguments passed to :func:`required`.
+        *args: Additional positional arguments passed to ``required``.
         default: Value to return on failure.
-        **kw: Additional keyword arguments passed to :func:`required`.
+        **kw: Additional keyword arguments passed to ``required``.
             Defaults: ``quiet=True``, ``throw=False``.
 
     Returns:
         The imported object, or ``default`` if specified and import failed,
         or None if import failed and no default specified.
+
+    Raises:
+        ImportError: If import fails and ``throw=True`` is passed in **kw.
 
     Example:
         >>> optional("natsort.natsorted", default=sorted)
@@ -338,7 +350,8 @@ sort: Callable[..., list[object]] = optional(
 
 
 def get_path(
-    path: str | Path, root: str | Path | None = None,
+    path: str | Path,
+    root: str | Path | None = None,
 ) -> Path:
     """Resolve a path relative to a root directory.
 
@@ -346,7 +359,8 @@ def get_path(
     - ``.``: Returns as-is (current directory reference)
     - ``..``, ``...``, etc.: Go up N-1 parent directories from root
     - ``../foo``: Resolve relative to root
-    - ``subdir/name``: Extract path segment from root string
+    - ``subdir/name``: If ``path`` is a substring of ``root``, return the
+        prefix of ``root`` up to the first occurrence of ``path``.
     - ``dirname``: Walk up from root looking for directory name
 
     Args:
@@ -356,6 +370,12 @@ def get_path(
 
     Returns:
         The resolved absolute Path.
+
+    Example:
+        >>> get_path("..", "/project/src")
+        '/project'
+        >>> get_path("src", "/project/src/module.py")
+        '/project/src'
 
     Raises:
         TypeError: If root is not str, Path, or None.

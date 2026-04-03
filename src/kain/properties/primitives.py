@@ -7,27 +7,30 @@ foundational descriptor classes (:class:`BaseProperty` and
 Key concepts
 ------------
 
-* **``BaseProperty``** – Abstract-ish base for all descriptors.  It provides
+* **``BaseProperty``** - Abstract-ish base for all descriptors.  It provides
   introspective attributes (``name``, ``title``, ``header``) and the
   ``with_parent`` classmethod that enables *parent-calling* properties.
-* **``bound_property``** – The simplest concrete descriptor.  It replaces an
+* **``bound_property``** - The simplest concrete descriptor.  It replaces an
   instance method, stores the computed value in the instance ``__dict__``, and
   raises on class-level access or deletion.
-* **``parent_call``** – A function wrapper used by ``with_parent``.  It walks
+* **``parent_call``** - A function wrapper used by ``with_parent``.  It walks
   the MRO to find the *parent* descriptor with the same name, extracts its
   wrapped function, evaluates it, and then passes that result as the *second*
   positional argument to the user-defined override.
-* **``extract_wrapped``** – Central registry of "how to get the original user
+* **``extract_wrapped``** - Central registry of "how to get the original user
   function back out of a descriptor".  Needed by ``parent_call`` so that it
   can invoke the parent implementation with the same ``(node, *args, **kw)``
   signature.
-* **``cache``** – Thin convenience wrapper around :func:`functools.lru_cache`.
+* **``cache``** - Thin convenience wrapper around :func:`functools.lru_cache`.
 """
 
+from __future__ import annotations
+
+from collections.abc import Callable
 from contextlib import suppress
 from functools import cached_property, lru_cache, partial, wraps
 from inspect import iscoroutine, iscoroutinefunction, isfunction, ismethod
-from typing import Any, override
+from typing import Any, Generic, Never, Self, TypeVar, overload, override
 
 from kain.classes import Missing
 from kain.internals import (
@@ -38,10 +41,13 @@ from kain.internals import (
 
 __all__ = ("bound_property",)
 
+T = TypeVar("T")
+R = TypeVar("R")
+
 # Sentinel used throughout the package to mean "no value / not provided".
 # It is deliberately truthy-false (``bool(Missing()) == False``) so it can
 # be used in default-argument positions without colliding with ``None``.
-Nothing = Missing()
+Nothing: Missing = Missing()
 
 
 class PropertyError(Exception):
@@ -51,7 +57,7 @@ class PropertyError(Exception):
 class ContextFaultError(PropertyError):
     """Raised when a descriptor is accessed in an unsupported context.
 
-    Examples: accessing an instance-only property on the class, or a
+    Example: accessing an instance-only property on the class, or a
     class-only property on an instance, or with ``node is None``.
     """
 
@@ -73,6 +79,7 @@ class AttributeException(PropertyError):  # noqa: N818
     """
 
     def __init__(self, origin: BaseException) -> None:
+        """Initialize with a formatted attribute error message."""
         self.exception: BaseException = origin
         super().__init__(self.message)
 
@@ -82,6 +89,16 @@ class AttributeException(PropertyError):  # noqa: N818
         return str(self.exception).rsplit(":", 1)[-1]
 
 
+@overload
+def cache() -> Callable[[Callable[..., R]], Callable[..., R]]: ...
+@overload
+def cache(limit: None) -> Callable[[Callable[..., R]], Callable[..., R]]: ...
+@overload
+def cache(
+    limit: float,
+) -> Callable[[Callable[..., R]], Callable[..., R]]: ...
+@overload
+def cache(limit: Callable[..., R]) -> Callable[..., R]: ...
 def cache(limit: Any = None):
     """Return an :func:`lru_cache` decorator (optionally pre-applied).
 
@@ -91,18 +108,17 @@ def cache(limit: Any = None):
     * ``@cache(128)``    → ``lru_cache(maxsize=128)``
     * ``@cache(my_func)``→ ``lru_cache(maxsize=None)(my_func)``
 
-    Parameters
-    ----------
-    limit:
-        * If callable → apply ``lru_cache(maxsize=None)`` to it immediately.
-        * If ``None`` → return ``lru_cache(maxsize=None)``.
-        * If positive int/float → return ``lru_cache(maxsize=limit)``.
+    Args:
+        limit: If callable, apply ``lru_cache(maxsize=None)`` immediately.
+            If ``None``, return ``lru_cache(maxsize=None)``.
+            If a positive int/float, return ``lru_cache(maxsize=limit)``.
 
-    Raises
-    ------
-    TypeError
-        If ``limit`` is a ``classmethod``/``staticmethod`` (ordering mistake)
-        or an invalid type.
+    Returns:
+        An ``lru_cache`` decorator (optionally pre-applied to ``limit``).
+
+    Raises:
+        TypeError: If ``limit`` is a ``classmethod``/``staticmethod``
+            (ordering mistake) or an invalid type.
     """
     function = partial(lru_cache, maxsize=None, typed=False)
 
@@ -120,10 +136,12 @@ def cache(limit: Any = None):
         msg = f"limit must be None or positive integer, not {Who.Is(limit)}"
         raise TypeError(msg)
 
-    return function(maxsize=limit) if limit else function()
+    if limit is None:
+        return function()
+    return function(maxsize=int(limit))
 
 
-def extract_wrapped(obj: object):
+def extract_wrapped(obj: object) -> Callable[..., Any]:
     """Extract the original user function from a descriptor object.
 
     This is the inverse operation of wrapping a function inside a descriptor.
@@ -137,10 +155,15 @@ def extract_wrapped(obj: object):
     3. Built-in :class:`property` → returns ``obj.fget``
     4. :class:`functools.cached_property` → returns ``obj.func``
 
-    Raises
-    ------
-    NotImplementedError
-        If ``obj`` is not one of the supported descriptor types.
+    Args:
+        obj: The descriptor object to unwrap.
+
+    Returns:
+        The original user function wrapped by ``obj``.
+
+    Raises:
+        NotImplementedError: If ``obj`` is not one of the supported
+            descriptor types.
     """
     # when it's default instance-method replacer
     if Is.subclass(obj, bound_property):
@@ -154,7 +177,7 @@ def extract_wrapped(obj: object):
     if Is.subclass(obj, property):
         return obj.fget
 
-    # when wrapped functions stored in .func
+    # when the wrapped function is stored in `.func`
     if Is.subclass(obj, cached_property):
         return obj.func
 
@@ -167,7 +190,7 @@ def extract_wrapped(obj: object):
     raise NotImplementedError(msg)
 
 
-def parent_call(func):
+def parent_call(func: Callable[..., R]) -> Callable[..., R]:
     """Wrap ``func`` so that it receives the parent descriptor's value first.
 
     This is the engine behind ``BaseProperty.with_parent``.  When a property
@@ -193,19 +216,18 @@ def parent_call(func):
       without overriding — we skip the first match (the inherited parent)
       and take the next one up the chain.
 
-    Parameters
-    ----------
-    func: callable
-        The user-defined override function.
+    Args:
+        func: The user-defined override function.
 
-    Returns
-    -------
-    callable
+    Returns:
         A wrapper that supplies ``func(node, parent_value, *args, **kw)``.
+
+    Raises:
+        RecursionError: When the wrapper detects infinite recursion.
     """
 
     @wraps(func)
-    def parent_caller(node, *args, **kw):
+    def parent_caller(node: object, *args: object, **kw: object) -> R:
         try:
             desc = get_attr(
                 Is.classOf(node),
@@ -232,7 +254,7 @@ def parent_call(func):
     return parent_caller
 
 
-def invoсation_context_check(func):
+def invocation_context_check(func: Callable[..., R]) -> Callable[..., R]:
     """Decorator that validates the ``node`` context before calling ``func``.
 
     .. note::
@@ -247,21 +269,25 @@ def invoсation_context_check(func):
     * ``False`` → ``node`` must *not* be a class.
     * ``None``  → ``node`` may be anything except ``None``.
 
-    Raises
-    ------
-    ContextFaultError
-        If the context does not match ``self.klass``.
+    Args:
+        func: The function to wrap.
+
+    Returns:
+        A wrapped function that validates ``node`` before calling ``func``.
+
+    Raises:
+        ContextFaultError: If the context does not match ``self.klass``.
     """
 
     @wraps(func)
-    def context(self, node, *args, **kw):
-        if (klass := self.klass) is not None and (
+    def context(self: object, node: object, *args: object, **kw: object) -> R:
+        if (klass := self.klass) is not None and (  # type: ignore[attr-defined]
             node is None or klass != Is.Class(node)
         ):
-            msg = f"{Who.Is(func)} exception, {self.header_with_context(node)}, {node=}"
+            msg = f"{Who.Is(func)} exception, {self.header_with_context(node)}, {node=}"  # type: ignore[attr-defined]
 
             if node is None and not klass:
-                msg = f"{msg}; looks like as non-instance invokation"
+                msg = f"{msg}; looks like a non-instance invocation"
             raise ContextFaultError(msg)
 
         return func(self, node, *args, **kw)
@@ -282,18 +308,26 @@ class BaseProperty:
       properties via :func:`parent_call`.
     """
 
+    function: Callable[..., Any]
+
     @classmethod
-    def with_parent(cls, function):
+    def with_parent(cls, function: Callable[..., R]) -> Self:
         """Create a descriptor instance that delegates to its parent MRO entry.
 
         The wrapped ``function`` will be called as
         ``function(node, parent_value, *args, **kw)`` where ``parent_value``
         is the result of evaluating the next descriptor up the inheritance
         chain with the same attribute name.
+
+        Args:
+            function: The user-defined override function.
+
+        Returns:
+            A descriptor instance configured with parent-calling behavior.
         """
         return cls(parent_call(function))
 
-    def __init__(self, function) -> None:
+    def __init__(self, function: Callable[..., Any]) -> None:
         """Store the user-defined function that computes the property value."""
         self.function = function
 
@@ -348,20 +382,20 @@ class BaseProperty:
         if node is not None:
             mode = ("instance", "class")[Is.Class(node)]
 
-        return (
-            f"{self.header} called with {mode} context ({Who.Addr(node)})"
-        )
+        return f"{self.header} called with {mode} context ({Who.Addr(node)})"
 
     @override
     def __str__(self) -> str:
+        """Return the property name."""
         return f"<{self.header}>"
 
     @override
     def __repr__(self) -> str:
+        """Return a detailed representation for debugging."""
         return f"<{self.title}>"
 
 
-class bound_property(BaseProperty):
+class bound_property(BaseProperty, Generic[T, R]):
     """Simple instance-bound descriptor (non-caching, read-only).
 
     ``bound_property`` is the moral equivalent of a write-once instance
@@ -378,7 +412,16 @@ class bound_property(BaseProperty):
     must use ``@pin.native`` (i.e. :class:`cached_property`) instead.
     """
 
-    def __init__(self, function) -> None:
+    @overload
+    def __new__(cls, function: Callable[[T], R]) -> bound_property[T, R]: ...
+    @overload
+    def __new__(cls, function: Callable[..., R]) -> bound_property[Any, R]: ...
+    def __new__(cls, function: Callable[..., R]) -> bound_property[Any, R]:
+        """Create a new bound-property instance."""
+        return object.__new__(cls)
+
+    def __init__(self, function: Callable[[T], R]) -> None:
+        """Initialize the bound property."""
         if iscoroutinefunction(function):
             msg = (
                 f"{Who.Is(function)} is coroutine function, "
@@ -389,24 +432,27 @@ class bound_property(BaseProperty):
 
     @cached_property
     def title(self) -> str:
-        return f"instance just-replace-descriptor {Who.Addr(self)}"
+        """Return a display title for this property."""
+        return f"instance just-replace descriptor {Who.Addr(self)}"
 
     @override
     def header_with_context(self, node: object) -> str:
+        """Return a header string with owner context."""
         return self.footer(node)
 
-    def __get__(self, node: object, klass: object = Nothing) -> object:
+    @overload
+    def __get__(self, node: None, klass: object = ...) -> Never: ...
+    @overload
+    def __get__(self, node: T, klass: object = ...) -> R: ...
+    def __get__(self, node: object | None, klass: object = Nothing) -> R:
         """Return the cached value from ``node.__dict__`` or compute it once.
 
-        Parameters
-        ----------
-        node:
-            The instance on which the attribute was accessed.  If ``None``,
-            this means class-level access, which is forbidden.
-        klass:
-            The owner class (supplied automatically by the descriptor
-            protocol).  Unused here except for error reporting when
-            ``node is None``.
+        Args:
+            node: The instance on which the attribute was accessed.
+                If ``None``, this means class-level access, which is forbidden.
+            klass: The owner class (supplied automatically by the descriptor
+                protocol). Unused here except for error reporting when
+                ``node is None``.
         """
         if node is None:
             raise ContextFaultError(self.header_with_context(klass))

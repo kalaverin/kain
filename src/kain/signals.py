@@ -2,9 +2,9 @@
 
 This module provides mechanisms for:
 
-* **Graceful shutdown on signals** – ``on_quit`` singleton that schedules
+* **Graceful shutdown on signals** - ``on_quit`` singleton that schedules
 callbacks and ensures they run on SIGINT/SIGTERM/SIGQUIT or uncaught exceptions.
-* **File-change detection** – ``quit_at`` polls the main script's mtime and
+* **File-change detection** - ``quit_at`` polls the main script's mtime and
 exits when it changes (useful for development auto-reloaders).
 
 Example:
@@ -125,6 +125,11 @@ class on_quit(metaclass=Singleton):
         we capture that hook in ``hooks_chain`` and re-inject ourselves.
         All hooks in the chain are called in order before delegating to
         the original hook and finally running teardown.
+
+        Args:
+            exc_type: The exception type.
+            exc_value: The exception instance.
+            traceback: The traceback object.
         """
         if sys.excepthook is not self._proxy:
             self.hooks_chain.append(sys.excepthook)
@@ -151,6 +156,10 @@ class on_quit(metaclass=Singleton):
         """Handle process signals by tearing down and exiting.
 
         The exit code is hard-coded to ``1`` to indicate abnormal termination.
+
+        Args:
+            _signum: The signal number.
+            _frame: The current stack frame.
         """
         self.teardown()
         sys.exit(1)
@@ -165,6 +174,9 @@ class on_quit(metaclass=Singleton):
         The ``threading`` module's hook receives a struct with ``exc_type``,
         ``exc_value``, ``exc_traceback``, and ``thread``. We skip cases where
         the thread died with ``SystemExit`` or no exception at all.
+
+        Args:
+            args: The exception hook arguments.
         """
         if args.exc_type is None or args.exc_type is SystemExit:
             return
@@ -194,6 +206,9 @@ class on_quit(metaclass=Singleton):
         Callbacks are invoked in registration order. Exceptions raised by
         callbacks are caught and emitted as warnings; they do not prevent
         subsequent callbacks from running.
+
+        Args:
+            func: The callback to register.
         """
         self.callbacks.append(func)
 
@@ -208,6 +223,9 @@ class on_quit(metaclass=Singleton):
 
         Hooks are called before the original ``sys.excepthook`` during
         the exception handling flow.
+
+        Args:
+            func: The exception hook to add.
         """
         self.hooks_chain.append(func)
 
@@ -265,24 +283,21 @@ def quit_at(
     received, the global ``NeedRestart`` flag is set to ``True`` and the
     next check will trigger the exit.
 
-    Parameters
-    ----------
-    func:
-        Callable to invoke when a change is detected. Defaults to
-        ``sys.exit``.
-    signal:
-        POSIX signal number to listen for (e.g., ``signal.SIGUSR1``).
-        Pass ``0`` to disable signal handling.
-    errno:
-        Exit code passed to ``func`` on change detection. Default ``137``
-        (128 + ``SIGKILL``) conventionally means "external termination".
-    **kw:
-        Additional keyword arguments merged into the returned callable's
-        namespace (used internally for ``sleep`` and ``poll`` defaults).
+    Args:
+        func:
+            Callable to invoke when a change is detected. Defaults to
+            ``sys.exit``.
+        signal:
+            POSIX signal number to listen for (e.g., ``signal.SIGUSR1``).
+            Pass ``0`` to disable signal handling.
+        errno:
+            Exit code passed to ``func`` on change detection. Default ``137``
+            (128 + ``SIGKILL``) conventionally means "external termination".
+        **kw:
+            Additional keyword arguments merged into the returned callable's
+            namespace (used internally for ``sleep`` and ``poll`` defaults).
 
-    Returns
-    -------
-    _OnChangeCallable
+    Returns:
         A callable with signature ``(sleep=0.0) -> bool``. Returns ``False``
         when the application should exit. The callable has a ``sleep``
         method for blocking checks.
@@ -340,17 +355,14 @@ def quit_at(
     def sleep(wait: float = 0.0, /, poll: float = 0.0) -> bool:
         """Block for up to ``wait`` seconds while polling for changes.
 
-        Parameters
-        ----------
-        wait:
-            Maximum time to block (seconds). Pass ``0`` to return immediately.
-        poll:
-            Interval between checks (seconds). Defaults to ``2.5`` or the
-            value passed in ``kw["poll"]``.
+        Args:
+            wait:
+                Maximum time to block (seconds). Pass ``0`` to return immediately.
+            poll:
+                Interval between checks (seconds). Defaults to ``2.5`` or the
+                value passed in ``kw["poll"]``.
 
-        Returns
-        -------
-        bool
+        Returns:
             ``True`` if the loop should continue, ``False`` if a change was
             detected and ``func(errno)`` was called.
         """

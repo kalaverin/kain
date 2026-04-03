@@ -30,6 +30,7 @@ from kain.properties.primitives import (
     PropertyError,
     ReadOnlyError,
     bound_property,
+    cache,
 )
 from kain.properties.proxy_to import (
     proxy_to,
@@ -42,6 +43,7 @@ __all__ = (
     "PropertyError",
     "ReadOnlyError",
     "bound_property",
+    "cache",
     "cached_property",
     "class_cached_property",
     "class_parent_cached_property",

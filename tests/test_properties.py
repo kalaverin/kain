@@ -904,11 +904,17 @@ class TestCustomCallbackBy:
             pin.native.ttl("invalid")
 
     def test_ttl_rejects_zero(self) -> None:
-        with pytest.raises(ValueError, match="expire must be positive"):
+        with pytest.raises(
+            ValueError,
+            match="expire must be a positive number",
+        ):
             pin.native.ttl(0)
 
     def test_ttl_rejects_negative(self) -> None:
-        with pytest.raises(ValueError, match="expire must be positive"):
+        with pytest.raises(
+            ValueError,
+            match="expire must be a positive number",
+        ):
             pin.native.ttl(-1)
 
 

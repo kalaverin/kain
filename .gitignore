@@ -8,6 +8,7 @@ __pycache__/
 
 !INSTALL.md
 !README.md
+!.agent/
 
 !.env.sample
 !.envrc

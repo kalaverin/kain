@@ -1,12 +1,8 @@
+"""Public API for the ``kain`` utility library."""
+
 from kain.classes import (
     Missing,
     Nothing,
-)
-from kain.descriptors import (
-    cache,
-    class_property,
-    mixed_property,
-    pin,
 )
 from kain.importer import (
     add_path,
@@ -23,6 +19,12 @@ from kain.internals import (
 )
 from kain.monkey import (
     Monkey,
+)
+from kain.properties import (
+    cache,
+    class_property,
+    mixed_property,
+    pin,
 )
 from kain.signals import (
     on_quit,

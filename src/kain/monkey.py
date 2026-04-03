@@ -3,10 +3,10 @@
 This module provides a small toolkit for runtime modification of
 existing objects:
 
-    - ``Monkey.expect`` – decorator that silences specified exceptions.
-    - ``Monkey.patch`` – replace an attribute on a module or object.
-    - ``Monkey.bind`` – attach a new function to a target object.
-    - ``Monkey.wrap`` – wrap an existing callable with custom logic.
+    - ``Monkey.expect`` - decorator that silences specified exceptions.
+    - ``Monkey.patch`` - replace an attribute on a module or object.
+    - ``Monkey.bind`` - attach a new function to a target object.
+    - ``Monkey.wrap`` - wrap an existing callable with custom logic.
 
 Example:
     >>> from kain.monkey import Monkey
@@ -128,7 +128,9 @@ class Monkey:
         if getattr(node, name, None) is new:
             return new
 
-        old = required(cast("str", node), name) if Who.Is(node) != name else node
+        old = (
+            required(cast("str", node), name) if Who.Is(node) != name else node
+        )
 
         setattr(node, name, new)
         new = getattr(node, name)
@@ -157,6 +159,11 @@ class Monkey:
 
         Returns:
             A decorator that binds the wrapped function to *node*.
+
+        Raises:
+            ImportError: If *node* is a string and ``required`` fails to
+                resolve it.
+            AttributeError: If ``setattr`` on *node* fails.
         """
         node = required(node) if isinstance(node, str) else node
 
@@ -195,6 +202,10 @@ class Monkey:
 
         Returns:
             A decorator that returns the wrapper function.
+
+        Raises:
+            ImportError: If *node* is a string and ``required`` fails to
+                resolve it.
         """
         node = required(node) if isinstance(node, str) else node
 

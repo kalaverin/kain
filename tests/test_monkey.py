@@ -288,3 +288,152 @@ class TestMonkeyWrap:
             node.func = Monkey.mapping.pop(patched)
         else:
             node.func = lambda: None
+
+
+class TestMonkeyExpectExtended:
+    """Extended tests for Monkey.expect."""
+
+    def test_expect_multiple_exceptions(self) -> None:
+        class Kls:
+            @Monkey.expect(ValueError, TypeError)
+            def multi(cls) -> None:
+                raise TypeError("bad")
+
+        Kls.multi()
+
+    def test_expect_returns_none_on_suppression(self) -> None:
+        class Kls:
+            @Monkey.expect(KeyError)
+            def fail(cls) -> int:
+                raise KeyError("missing")
+
+        assert Kls.fail() is None
+
+    def test_expect_preserves_return_on_success(self) -> None:
+        class Kls:
+            @Monkey.expect(RuntimeError)
+            def ok(cls) -> str:
+                return "success"
+
+        assert Kls.ok() == "success"
+
+    def test_expect_as_bound_method(self) -> None:
+        class Kls:
+            @Monkey.expect(ZeroDivisionError)
+            def div(cls, a: int, b: int) -> float | None:
+                return a / b
+
+        assert Kls.div(1, 0) is None
+        assert Kls.div(4, 2) == 2.0
+
+
+class TestMonkeyPatchExtended:
+    """Extended tests for Monkey.patch."""
+
+    def test_patch_object_attribute(self) -> None:
+        node = types.SimpleNamespace(value=1)
+        Monkey.patch((node, "value"), 2)
+        assert node.value == 2
+        node.value = Monkey.mapping.pop(2, 1)
+
+    def test_patch_function(self) -> None:
+        node = types.SimpleNamespace()
+
+        def original() -> str:
+            return "old"
+
+        def replacement() -> str:
+            return "new"
+
+        node.func = original
+        Monkey.patch((node, "func"), replacement)
+        assert node.func() == "new"
+        node.func = Monkey.mapping.pop(replacement, original)
+
+    def test_patch_identity_shortcircuit(self) -> None:
+        node = types.SimpleNamespace()
+        val = object()
+        node.x = val
+        result = Monkey.patch((node, "x"), val)
+        assert result is val
+        assert val not in Monkey.mapping
+
+    def test_patch_class_attribute(self) -> None:
+        class Node:
+            attr = "old"
+
+        Monkey.patch((Node, "attr"), "new")
+        assert Node.attr == "new"
+        Node.attr = Monkey.mapping.pop("new", "old")
+
+    def test_patch_restores_via_mapping(self) -> None:
+        node = types.SimpleNamespace(a=1)
+        Monkey.patch((node, "a"), 2)
+        old = Monkey.mapping.pop(2)
+        node.a = old
+        assert node.a == 1
+
+
+class TestMonkeyBindExtended:
+    """Extended tests for Monkey.bind."""
+
+    def test_bind_returns_wrapper(self) -> None:
+        node = types.SimpleNamespace()
+
+        @Monkey.bind(node)
+        def func() -> int:
+            return 1
+
+        assert node.func() == 1
+
+    def test_bind_kwargs_passed_through(self) -> None:
+        node = types.SimpleNamespace()
+
+        @Monkey.bind(node)
+        def func(**kw: object) -> dict[str, object]:
+            return kw
+
+        assert node.func(a=1, b=2) == {"a": 1, "b": 2}
+
+    def test_bind_args_passed_through(self) -> None:
+        node = types.SimpleNamespace()
+
+        @Monkey.bind(node)
+        def func(a: int, b: int) -> int:
+            return a + b
+
+        assert node.func(1, 2) == 3
+
+
+class TestMonkeyWrapExtended:
+    """Extended tests for Monkey.wrap."""
+
+    def test_wrap_preserves_args(self) -> None:
+        node = types.SimpleNamespace()
+        node.fn = lambda x, y: x + y
+
+        @Monkey.wrap(node, "fn")
+        def wrapper(wrapped: object, x: int, y: int) -> int:
+            return wrapped(x, y) * 2  # type: ignore[operator]
+
+        assert node.fn(1, 2) == 6
+
+    def test_wrap_staticmethod(self) -> None:
+        class Node:
+            @staticmethod
+            def static() -> str:
+                return "static"
+
+        original = Node.static
+
+        @Monkey.wrap(Node, "static")
+        def wrapper(wrapped: object) -> str:
+            return "wrap:" + wrapped()  # type: ignore[operator]
+
+        assert Node.static() == "wrap:static"
+
+        patched = Node.static
+        if patched in Monkey.mapping:
+            Node.static = Monkey.mapping.pop(patched)
+        else:
+            Node.static = original  # type: ignore[assignment]
