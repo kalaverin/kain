@@ -9,28 +9,44 @@ from datetime import datetime
 from logging import getLogger
 from pathlib import Path
 from signal import signal as bind
-from types import FrameType
-from typing import Any
+from types import FrameType, TracebackType
+from typing import Any, Protocol
 
 from kain.classes import Singleton
 from kain.descriptors import cache
 from kain.internals import Who
 
-__all__ = "on_quit", "quit_at"
+__all__ = (
+    "on_quit",
+    "quit_at",
+)
 
 logger = getLogger(__name__)
-NeedRestart = False
+NeedRestart: bool = False
 
 
-class OnSystemExit(metaclass=Singleton):
+class _OnChangeCallable(Protocol):
+    def __call__(self, *, sleep: float = 0.0) -> bool: ...
+    sleep: Callable[[float, float], bool]
 
-    def __init__(self):
 
-        self.callbacks = []
-        self.hooks_chain = []
+class on_quit(metaclass=Singleton):
 
-        self.original_hook = sys.excepthook
-        self.already_called = False
+    def __init__(self) -> None:
+        self.callbacks: list[Callable[[], Any]] = []
+        self.hooks_chain: list[
+            Callable[
+                [type[BaseException], BaseException, TracebackType | None],
+                Any,
+            ],
+        ] = []
+
+        self.original_hook: Callable[
+            [type[BaseException], BaseException, TracebackType | None],
+            Any,
+        ] = sys.excepthook
+        self.already_called: bool = False
+        self._proxy = self.exceptions_hooks_proxy
 
         self.inject_hook()
         self.inject_signal_handler()
@@ -39,16 +55,15 @@ class OnSystemExit(metaclass=Singleton):
         atexit.register(self.teardown)
 
     def inject_hook(self) -> None:
-        sys.excepthook = self.exceptions_hooks_proxy
+        sys.excepthook = self._proxy
 
     def exceptions_hooks_proxy(
         self,
         exc_type: type[BaseException],
         exc_value: BaseException,
-        traceback: Any,
+        traceback: TracebackType | None,
     ) -> None:
-
-        if sys.excepthook != self.exceptions_hooks_proxy:
+        if sys.excepthook is not self._proxy:
             self.hooks_chain.append(sys.excepthook)
             self.inject_hook()
 
@@ -57,7 +72,7 @@ class OnSystemExit(metaclass=Singleton):
                 hook(exc_type, exc_value, traceback)
             except Exception as e:  # noqa: BLE001
                 warnings.warn(
-                    f"{Who(hook)}: {e!r}",
+                    f"{Who.Is(hook)}: {e!r}",
                     RuntimeWarning,
                     stacklevel=2,
                 )
@@ -65,10 +80,10 @@ class OnSystemExit(metaclass=Singleton):
         self.teardown()
 
     def inject_signal_handler(self) -> None:
-        for sig in signal.SIGINT, signal.SIGTERM, signal.SIGQUIT:
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGQUIT):
             bind(sig, self.signal_handler)
 
-    def signal_handler(self, _: int, __: FrameType | None) -> None:
+    def signal_handler(self, _signum: int, _frame: FrameType | None) -> None:
         self.teardown()
         sys.exit(1)
 
@@ -76,10 +91,10 @@ class OnSystemExit(metaclass=Singleton):
         threading.excepthook = self.threading_handler
 
     def threading_handler(self, args: threading.ExceptHookArgs) -> None:
-        if args.exc_type is SystemExit:
+        if args.exc_type is None or args.exc_type is SystemExit:
             return
 
-        self.exceptions_hooks_proxy(
+        self._proxy(
             args.exc_type,
             args.exc_value,
             args.exc_traceback,
@@ -88,15 +103,21 @@ class OnSystemExit(metaclass=Singleton):
     def restore_original_handlers(self) -> None:
         bind(signal.SIGINT, signal.SIG_DFL)
         bind(signal.SIGTERM, signal.SIG_DFL)
-        bind(signal.SIGHUP, signal.SIG_DFL)
+        bind(signal.SIGQUIT, signal.SIG_DFL)
 
         sys.excepthook = self.original_hook
         threading.excepthook = threading.__excepthook__
 
-    def schedule(self, func: Callable) -> None:
+    def schedule(self, func: Callable[[], Any]) -> None:
         self.callbacks.append(func)
 
-    def add_hook(self, func: Callable) -> None:
+    def add_hook(
+        self,
+        func: Callable[
+            [type[BaseException], BaseException, TracebackType | None],
+            Any,
+        ],
+    ) -> None:
         self.hooks_chain.append(func)
 
     def teardown(self) -> None:
@@ -109,11 +130,10 @@ class OnSystemExit(metaclass=Singleton):
                     func()
                 except BaseException as e:  # noqa: BLE001
                     warnings.warn(
-                        f"{Who(func)}: {e!r}",
+                        f"{Who.Is(func)}: {e!r}",
                         RuntimeWarning,
                         stacklevel=2,
                     )
-
         finally:
             self.already_called = True
             self.restore_original_handlers()
@@ -134,11 +154,11 @@ def quit_at(
     func: Callable[..., Any] = sys.exit,
     signal: int = 0,
     errno: int = 137,
-    **kw,
-) -> Callable[..., bool]:
+    **kw: Any,
+) -> _OnChangeCallable:
     """Quit the program when the runned file is updated or signal is received."""
 
-    def handler(*_):
+    def handler(*_: Any) -> None:
         global NeedRestart  # noqa: PLW0603
         NeedRestart = True
         logger.warning(f"{signal=} received")
@@ -148,8 +168,7 @@ def quit_at(
 
     initial_stamp = get_mtime()
 
-    def on_change(*, sleep=0.0) -> bool:
-
+    def on_change(*, sleep: float = 0.0) -> bool:
         if NeedRestart and signal:
             logger.warning(f"stop by {signal=}")
             func(errno)
@@ -175,7 +194,7 @@ def quit_at(
 
         return True
 
-    def sleep(wait: float = 0.0, /, poll=0.0) -> bool:
+    def sleep(wait: float = 0.0, /, poll: float = 0.0) -> bool:
         if not wait:
             return True
 
@@ -186,8 +205,5 @@ def quit_at(
             time.sleep(poll)
         return solution
 
-    on_change.sleep = sleep
-    return on_change
-
-
-on_quit = OnSystemExit()
+    on_change.sleep = sleep  # type: ignore[attr-defined]
+    return on_change  # type: ignore[return-value]

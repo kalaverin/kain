@@ -39,6 +39,6 @@ class Singleton(type):
 
     @override
     def __call__(cls, *args: Any, **kw: dict[str, Any]) -> Any:
-        if cls.instance is not Missing:
+        if cls.instance is Nothing:
             cls.instance = super().__call__(*args, **kw)
         return cls.instance

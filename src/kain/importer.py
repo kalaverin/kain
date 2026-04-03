@@ -55,12 +55,12 @@ def get_child(path, parent, child):
     if not hasattr(parent, child):
         if not ismodule(parent):
             raise ImportError(
-                f"{path} (object {Who(parent)!a} hasn't attribute "
+                f"{path} (object {Who.Is(parent)} hasn't attribute "
                 f"{child!a}{Who.File(parent, ' in %a') or ''})",
             )
 
         if not set(dir(parent)) - IGNORED_OBJECT_FIELDS:
-            chunk = f"{Who(parent)}.{child}"
+            chunk = f"{Who.Is(parent)}.{child}"
             raise ImportError(
                 f"{path} (from partially initialized module "
                 f"{chunk!a}, most likely due to a circular import"
@@ -68,7 +68,7 @@ def get_child(path, parent, child):
             )
 
         raise ImportError(
-            f"{path} (module {Who(parent)!a} hasn't member {child!a}"
+            f"{path} (module {Who.Is(parent)} hasn't member {child!a}"
             f"{Who.File(parent, ' in %a') or ''})",
         )
 
@@ -94,7 +94,7 @@ def import_object(path, something=None):
     logger.debug(f"lookup: {path}")
 
     if something:
-        locator = f"{Who(something)}.{path}"
+        locator = f"{Who.Is(something)}.{path}"
         sequence = path.split(".")
 
     else:
@@ -105,11 +105,11 @@ def import_object(path, something=None):
             raise ImportError(f"{path} (isn't exists?)")
 
     if not sequence:
-        logger.debug(f"import path: {Who(something)}")
+        logger.debug(f"import path: {Who.Is(something)}")
 
     else:
         logger.debug(
-            f'split path: {Who(something)} (module) -> {".".join(sequence)} (path)',
+            f'split path: {Who.Is(something)} (module) -> {".".join(sequence)} (path)',
         )
 
     for name in sequence:
@@ -184,7 +184,7 @@ def get_path(path, root=None):  # noqa: PLR0912
         root = Path(root)
     else:
         raise TypeError(
-            f"root={root!r} can be str | {Who(Path)} | None, not {Who.Is(root)}",
+            f"root={root!r} can be str | {Who.Is(Path)} | None, not {Who.Is(root)}",
         )
 
     spath = str(path).strip("/")
