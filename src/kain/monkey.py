@@ -115,7 +115,7 @@ class Monkey:
             node, name = module
 
         elif Is.module(module):
-            node, name = module, cast(str, getattr(new, "__name__", ""))
+            node, name = module, cast("str", getattr(new, "__name__", ""))
 
         else:
             path, name = module.rsplit(".", 1)
@@ -128,7 +128,7 @@ class Monkey:
         if getattr(node, name, None) is new:
             return new
 
-        old = required(cast(str, node), name) if Who.Is(node) != name else node
+        old = required(cast("str", node), name) if Who.Is(node) != name else node
 
         setattr(node, name, new)
         new = getattr(node, name)
@@ -167,7 +167,7 @@ class Monkey:
                     return func(node, *args, **kw)
                 return func(*args, **kw)
 
-            local = name or cast(str, getattr(func, "__name__", ""))
+            local = name or cast("str", getattr(func, "__name__", ""))
             setattr(node, local, wrapper)
             logger.info(f"{Who.Is(node)}.{local} <- {Who.Addr(func)}")
             return wrapper
@@ -199,9 +199,9 @@ class Monkey:
         node = required(node) if isinstance(node, str) else node
 
         def wrap(func: Callable[..., object]) -> Callable[..., object]:
-            wrapped_name = name or cast(str, getattr(func, "__name__", ""))
+            wrapped_name = name or cast("str", getattr(func, "__name__", ""))
             if Who.Name(node) != wrapped_name:
-                wrapped_func = required(cast(str, node), wrapped_name)
+                wrapped_func = required(cast("str", node), wrapped_name)
             else:
                 wrapped_func = node
 

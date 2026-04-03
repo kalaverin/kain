@@ -9,24 +9,14 @@ from typing import Any
 import pytest
 
 from kain.properties import (
-    bound_property,
-    cached_property,
-    class_cached_property,
-    class_parent_cached_property,
-    class_property,
-    mixed_cached_property,
-    mixed_parent_cached_property,
-    mixed_property,
-    pin,
-    post_cached_property,
-    post_parent_cached_property,
-    pre_cached_property,
-    pre_parent_cached_property,
-    PropertyError,
-    ContextFaultError,
-    ReadOnlyError,
     AttributeException,
     BaseProperty,
+    ContextFaultError,
+    PropertyError,
+    ReadOnlyError,
+    class_property,
+    mixed_property,
+    pin,
 )
 from kain.properties.primitives import cache
 
@@ -72,6 +62,7 @@ class TestPin:
 
     def test_rejects_async(self) -> None:
         with pytest.raises(TypeError):
+
             class Foo:
                 @pin
                 async def prop(self) -> int:
@@ -972,7 +963,6 @@ class TestEdgeCases:
             @pin
             def prop(self) -> None:
                 Foo.counter += 1
-                return None
 
         obj = Foo()
         assert obj.prop is None
@@ -987,7 +977,6 @@ class TestEdgeCases:
             @pin.native
             def prop(self) -> None:
                 Foo.counter += 1
-                return None
 
         obj = Foo()
         assert obj.prop is None

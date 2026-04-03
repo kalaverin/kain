@@ -18,9 +18,7 @@ from kain.properties.primitives import (
     ContextFaultError,
 )
 
-__all__ = (
-    "cached_property",
-)
+__all__ = ("cached_property",)
 
 
 class cached_property(class_parent_cached_property):

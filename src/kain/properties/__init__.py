@@ -26,21 +26,23 @@ from kain.properties.class_property import (
 from kain.properties.primitives import (
     AttributeException,
     BaseProperty,
-    bound_property,
     ContextFaultError,
     PropertyError,
     ReadOnlyError,
+    bound_property,
 )
 
 __all__ = (
     "AttributeException",
     "BaseProperty",
+    "ContextFaultError",
+    "PropertyError",
+    "ReadOnlyError",
     "bound_property",
     "cached_property",
     "class_cached_property",
     "class_parent_cached_property",
     "class_property",
-    "ContextFaultError",
     "mixed_cached_property",
     "mixed_parent_cached_property",
     "mixed_property",
@@ -49,8 +51,6 @@ __all__ = (
     "post_parent_cached_property",
     "pre_cached_property",
     "pre_parent_cached_property",
-    "PropertyError",
-    "ReadOnlyError",
 )
 
 

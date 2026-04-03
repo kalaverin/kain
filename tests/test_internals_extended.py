@@ -12,13 +12,10 @@ import sys
 import types
 import typing
 from collections import ChainMap, OrderedDict, defaultdict, deque
-from dataclasses import dataclass
-from enum import Enum
 from functools import partial
 from types import MappingProxyType, UnionType
 from typing import (
     Any,
-    Callable,
     Generic,
     Literal,
     Optional,
@@ -26,16 +23,11 @@ from typing import (
     Protocol,
     TypeVar,
     Union,
-    get_args,
-    get_origin,
 )
 
 import pytest
 
 from kain.internals import (
-    Builtins,
-    Collections,
-    Primitives,
     class_of,
     format_args_and_keywords,
     get_attr,
@@ -78,7 +70,7 @@ class TestClassOfTypingVariants:
             (None, type(None)),
             (int, int),
             (list[int], types.GenericAlias),
-            (typing.List[int], typing._GenericAlias),  # type: ignore[attr-defined]
+            (list[int], typing._GenericAlias),  # type: ignore[attr-defined]
             (int | str, UnionType),
             (..., type(...)),
             (NotImplemented, type(NotImplemented)),
@@ -338,8 +330,8 @@ class TestIsSubclassTypingVariants:
             ([], dict[str, int], False),
             ({}, dict[str, int], True),
             # typing.List
-            ([], typing.List[int], True),
-            ([], typing.List[str], True),  # origin match
+            ([], list[int], True),
+            ([], list[str], True),  # origin match
             # None types
             (1, None, False),
         ],
@@ -390,7 +382,7 @@ class TestObjectNameTypingVariants:
             (Any, True, "typing.Any"),
             (UnionType, True, "types.UnionType"),
             (list[int], True, "list"),
-            (typing.List[int], True, "typing.List"),
+            (list[int], True, "typing.List"),
             (Literal[1], True, "typing.Literal"),
             (TypeVar("T"), False, "T"),
             (ParamSpec("P"), False, "P"),
@@ -419,7 +411,11 @@ class TestPrettyModuleTypingVariants:
     """Module path extraction for typing and stdlib objects."""
 
     def test_pretty_module_stdlib(self) -> None:
-        assert pretty_module(os.path.join) in ("os.path", "posixpath", "ntpath")
+        assert pretty_module(os.path.join) in (
+            "os.path",
+            "posixpath",
+            "ntpath",
+        )
 
     def test_pretty_module_typing(self) -> None:
         assert pretty_module(Any) == "typing"
@@ -648,7 +644,9 @@ class TestIterStackVariants:
 
     def test_iter_stack_single_attr(self) -> None:
         result = list(iter_stack(3))
-        assert any("test_iter_stack_single_attr" in str(item) for item in result)
+        assert any(
+            "test_iter_stack_single_attr" in str(item) for item in result
+        )
 
     def test_iter_stack_multi_attr(self) -> None:
         result = list(iter_stack(0, 3))
@@ -708,7 +706,7 @@ class TestToAsciiAndBytesVariants:
             ("hello", None, "hello"),
             (b"hello", None, "hello"),
             ("café", "utf-8", "café"),
-            ("café".encode("utf-8"), "utf-8", "café"),
+            ("café".encode(), "utf-8", "café"),
         ],
     )
     def test_to_ascii(
@@ -727,7 +725,7 @@ class TestToAsciiAndBytesVariants:
         [
             ("hello", None, b"hello"),
             (b"hello", None, b"hello"),
-            ("café", "utf-8", "café".encode("utf-8")),
+            ("café", "utf-8", "café".encode()),
         ],
     )
     def test_to_bytes(

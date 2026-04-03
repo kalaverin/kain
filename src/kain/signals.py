@@ -12,7 +12,7 @@ Example:
     >>> @on_quit().schedule
     ... def cleanup():
     ...     print("Shutting down...")
-    
+
     >>> # In a daemon/main loop, check for file changes every 2.5s
     >>> checker = quit_at(signal=signal.SIGUSR1)  # Also exit on SIGUSR1
     >>> while checker.sleep(60):  # Returns False when exiting

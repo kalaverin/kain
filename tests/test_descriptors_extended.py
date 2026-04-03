@@ -13,18 +13,15 @@ from typing import Any
 import pytest
 
 from kain.descriptors import (
+    AbstractProperty,
+    AttributeException,
+    ContextFaultError,
+    PropertyError,
+    ReadOnlyError,
     cache,
     class_property,
     mixed_property,
     pin,
-    PropertyError,
-    ContextFaultError,
-    ReadOnlyError,
-    AttributeException,
-    AbstractProperty,
-    InsteadProperty,
-    BaseProperty,
-    Cached,
 )
 
 
@@ -124,6 +121,7 @@ class TestWithParent:
 
     def test_pin_with_parent(self) -> None:
         """with_parent allows accessing parent class property."""
+
         class Parent:
             counter = 0
 
@@ -144,6 +142,7 @@ class TestWithParent:
 
     def test_pin_native_with_parent(self) -> None:
         """with_parent works with pin.native (Cached)."""
+
         class Parent:
             counter = 0
 
@@ -164,6 +163,7 @@ class TestWithParent:
 
     def test_pin_cls_with_parent(self) -> None:
         """with_parent works with pin.cls (class-level)."""
+
         class Parent:
             counter = 0
 
@@ -183,6 +183,7 @@ class TestWithParent:
 
     def test_pin_any_with_parent(self) -> None:
         """with_parent works with pin.any (mixed)."""
+
         class Parent:
             counter = 0
 
@@ -203,6 +204,7 @@ class TestWithParent:
 
     def test_pin_pre_with_parent(self) -> None:
         """with_parent works with pin.pre."""
+
         class Parent:
             @pin.pre
             def prop(self_or_cls: Any) -> int:
@@ -218,6 +220,7 @@ class TestWithParent:
 
     def test_pin_post_with_parent(self) -> None:
         """with_parent works with pin.post."""
+
         class Parent:
             @pin.post
             def prop(self_or_cls: Any) -> int:
@@ -233,6 +236,7 @@ class TestWithParent:
 
     def test_class_property_with_parent(self) -> None:
         """with_parent works with class_property."""
+
         class Parent:
             counter = 0
 
@@ -251,6 +255,7 @@ class TestWithParent:
 
     def test_mixed_property_with_parent(self) -> None:
         """with_parent works with mixed_property."""
+
         class Parent:
             @mixed_property
             def prop(self_or_cls: Any) -> str:
@@ -266,6 +271,7 @@ class TestWithParent:
 
     def test_with_parent_without_parent_descriptor(self) -> None:
         """with_parent raises error when parent descriptor not found."""
+
         class Foo:
             @pin.with_parent
             def prop(self, parent_value: int) -> int:
@@ -282,7 +288,7 @@ class TestCustomCallbackBy:
 
     def test_pin_native_by_custom_callback(self) -> None:
         """Custom callback controls cache invalidation.
-        
+
         Callback signature: is_actual(self, node, timestamp=None)
         - On set: called as is_actual(self, node) -> timestamp
         - On get: called as is_actual(self, node, timestamp) -> bool
@@ -290,7 +296,9 @@ class TestCustomCallbackBy:
         call_count = 0
         should_invalidate = False
 
-        def is_actual(self: Any, node: Any, timestamp: float | None = None) -> bool | float:
+        def is_actual(
+            self: Any, node: Any, timestamp: float | None = None,
+        ) -> bool | float:
             if timestamp is None:
                 # Called on set, return current timestamp
                 return time_func()
@@ -316,12 +324,14 @@ class TestCustomCallbackBy:
 
     def test_pin_native_expired_by_alias(self) -> None:
         """.expired_by is alias for .by.
-        
+
         Callback returns True if expired (invalid), False if still valid.
         """
         expired = False
 
-        def is_still_valid(self: Any, node: Any, timestamp: float | None = None) -> bool | float:
+        def is_still_valid(
+            self: Any, node: Any, timestamp: float | None = None,
+        ) -> bool | float:
             if timestamp is None:
                 return time_func()  # Called on set
             return not expired  # Called on get - True means valid
@@ -346,7 +356,9 @@ class TestCustomCallbackBy:
         """Custom callback works with pin.cls."""
         expired = False
 
-        def is_still_valid(self: Any, node: Any, timestamp: float | None = None) -> bool | float:
+        def is_still_valid(
+            self: Any, node: Any, timestamp: float | None = None,
+        ) -> bool | float:
             if timestamp is None:
                 return time_func()
             return not expired
@@ -370,7 +382,9 @@ class TestCustomCallbackBy:
         """Custom callback works with pin.any."""
         expired = False
 
-        def is_still_valid(self: Any, node: Any, timestamp: float | None = None) -> bool | float:
+        def is_still_valid(
+            self: Any, node: Any, timestamp: float | None = None,
+        ) -> bool | float:
             if timestamp is None:
                 return time_func()
             return not expired
@@ -394,6 +408,7 @@ class TestCustomCallbackBy:
 
     def test_ttl_on_pin_cls(self) -> None:
         """TTL works with pin.cls."""
+
         class Foo:
             counter = 0
 
@@ -405,12 +420,14 @@ class TestCustomCallbackBy:
         assert Foo.prop == 42
         assert Foo.counter == 1
         from time import sleep
+
         sleep(0.02)
         assert Foo.prop == 42
         assert Foo.counter == 2
 
     def test_ttl_on_pin_any(self) -> None:
         """TTL works with pin.any."""
+
         class Foo:
             counter = 0
 
@@ -423,6 +440,7 @@ class TestCustomCallbackBy:
         assert obj.prop == 42
         assert Foo.counter == 1
         from time import sleep
+
         sleep(0.02)
         assert obj.prop == 42
         assert Foo.counter == 2
@@ -454,6 +472,7 @@ class TestExceptions:
 
     def test_context_fault_error_catchable(self) -> None:
         """ContextFaultError raised on invalid context access."""
+
         class Foo:
             @pin
             def prop(self) -> int:
@@ -464,6 +483,7 @@ class TestExceptions:
 
     def test_read_only_error_on_delete(self) -> None:
         """ReadOnlyError raised on delete attempt."""
+
         class Foo:
             @pin
             def prop(self) -> int:
@@ -476,6 +496,7 @@ class TestExceptions:
 
     def test_attribute_exception_wraps_error(self) -> None:
         """AttributeException wraps AttributeError from property."""
+
         class Foo:
             @pin.native
             def prop(self) -> int:
@@ -493,13 +514,13 @@ class TestEdgeCases:
 
     def test_pin_with_none_return(self) -> None:
         """pin caches None correctly."""
+
         class Foo:
             counter = 0
 
             @pin
             def prop(self) -> None:
                 Foo.counter += 1
-                return None
 
         obj = Foo()
         assert obj.prop is None
@@ -509,13 +530,13 @@ class TestEdgeCases:
 
     def test_pin_native_none_caching(self) -> None:
         """pin.native caches None correctly."""
+
         class Foo:
             counter = 0
 
             @pin.native
             def prop(self) -> None:
                 Foo.counter += 1
-                return None
 
         obj = Foo()
         assert obj.prop is None
@@ -524,6 +545,7 @@ class TestEdgeCases:
 
     def test_falsy_values_cached_correctly(self) -> None:
         """Falsy values (0, '', [], False) are cached correctly."""
+
         class Foo:
             counter = 0
 
@@ -560,6 +582,7 @@ class TestEdgeCases:
 
     def test_descriptor_string_repr(self) -> None:
         """Descriptors have meaningful string representation."""
+
         class Foo:
             @pin
             def prop(self) -> int:
@@ -573,6 +596,7 @@ class TestEdgeCases:
 
     def test_multiple_inheritance_with_pin(self) -> None:
         """pin works with multiple inheritance."""
+
         class Mixin:
             counter = 0
 
@@ -594,6 +618,7 @@ class TestEdgeCases:
 
     def test_pin_native_delete_then_reaccess(self) -> None:
         """After delete, property is recomputed."""
+
         class Foo:
             counter = 0
 
@@ -610,6 +635,7 @@ class TestEdgeCases:
 
     def test_class_property_no_cache(self) -> None:
         """class_property doesn't cache - called every time."""
+
         class Foo:
             counter = 0
 
@@ -625,6 +651,7 @@ class TestEdgeCases:
 
     def test_mixed_property_no_cache(self) -> None:
         """mixed_property doesn't cache - called every time."""
+
         class Foo:
             counter = 0
 
@@ -644,6 +671,7 @@ class TestDescriptorInternals:
 
     def test_pin_name_property(self) -> None:
         """pin descriptor has correct name property."""
+
         class Foo:
             @pin
             def my_property(self) -> int:
@@ -654,6 +682,7 @@ class TestDescriptorInternals:
 
     def test_pin_native_name_property(self) -> None:
         """pin.native descriptor has correct name property."""
+
         class Foo:
             @pin.native
             def my_property(self) -> int:
@@ -664,6 +693,7 @@ class TestDescriptorInternals:
 
     def test_is_data_property(self) -> None:
         """is_data property correctly identifies data descriptors."""
+
         class Foo:
             @pin.native
             def cached_prop(self) -> int:
@@ -676,6 +706,7 @@ class TestDescriptorInternals:
 
     def test_class_property_is_not_data(self) -> None:
         """class_property is not a data descriptor."""
+
         class Foo:
             @class_property
             def prop(cls) -> int:
@@ -686,6 +717,7 @@ class TestDescriptorInternals:
 
     def test_mixed_property_is_not_data(self) -> None:
         """mixed_property is not a data descriptor."""
+
         class Foo:
             @mixed_property
             def prop(self_or_cls: Any) -> int:
@@ -701,6 +733,7 @@ class TestAsyncEdgeCases:
     @pytest.mark.asyncio
     async def test_pin_native_async_return_value(self) -> None:
         """Async property returns awaitable."""
+
         class Foo:
             @pin.native
             async def prop(self) -> int:
@@ -714,6 +747,7 @@ class TestAsyncEdgeCases:
     @pytest.mark.asyncio
     async def test_pin_native_async_exception(self) -> None:
         """Async property propagates exceptions."""
+
         class Foo:
             @pin.native
             async def prop(self) -> int:
@@ -727,6 +761,7 @@ class TestAsyncEdgeCases:
     @pytest.mark.asyncio
     async def test_pin_native_async_caches_exception_future(self) -> None:
         """Async property caches the future, not the result."""
+
         class Foo:
             counter = 0
 
@@ -748,6 +783,7 @@ class TestCachedSetOperations:
 
     def test_manual_override_pin_native(self) -> None:
         """Manual set overrides cached value."""
+
         class Foo:
             @pin.native
             def prop(self) -> int:
@@ -760,6 +796,7 @@ class TestCachedSetOperations:
 
     def test_manual_override_pin_cls(self) -> None:
         """Manual set works on class-level property."""
+
         class Foo:
             @pin.cls
             def prop(cls) -> int:
@@ -771,6 +808,7 @@ class TestCachedSetOperations:
 
     def test_manual_override_pin_any_instance(self) -> None:
         """Manual set on instance for pin.any."""
+
         class Foo:
             @pin.any
             def prop(self_or_cls: Any) -> int:
@@ -784,10 +822,11 @@ class TestCachedSetOperations:
 
     def test_manual_override_pin_pre_class_only(self) -> None:
         """pin.pre only caches on class.
-        
+
         Note: PreCachedProperty.__set__ returns value without caching
         when node is not a class (instance access).
         """
+
         class Foo:
             counter = 0
 
@@ -800,7 +839,7 @@ class TestCachedSetOperations:
         obj = Foo()
         assert obj.prop == 1
         assert obj.prop == 2  # called again
-        
+
         # Manual set on instance - PreCachedProperty ignores it for instances
         obj.prop = 100
         # Since __set__ returns without storing for instances,
@@ -810,6 +849,7 @@ class TestCachedSetOperations:
 
     def test_manual_set_on_class_pin_pre(self) -> None:
         """Manual set on class works for pin.pre."""
+
         class Foo:
             counter = 0
 
@@ -821,13 +861,14 @@ class TestCachedSetOperations:
         # Class access caches
         assert Foo.prop == 1
         assert Foo.prop == 1  # cached
-        
+
         # Manual set on class
         Foo.prop = 100  # type: ignore
         assert Foo.prop == 100  # manually set
 
     def test_manual_override_pin_post_instance_only(self) -> None:
         """pin.post only caches on instance."""
+
         class Foo:
             counter = 0
 
@@ -847,6 +888,7 @@ class TestInheritanceScenarios:
 
     def test_diamond_inheritance_with_pin_native(self) -> None:
         """Diamond inheritance works with pin.native."""
+
         class A:
             counter = 0
 
@@ -871,6 +913,7 @@ class TestInheritanceScenarios:
 
     def test_override_with_different_descriptor_type(self) -> None:
         """Parent pin can be overridden with pin.native."""
+
         class Parent:
             @pin
             def prop(self) -> int:
@@ -892,6 +935,7 @@ class TestAbstractPropertyInterface:
 
     def test_abstract_property_requires_title(self) -> None:
         """Subclasses must implement title property."""
+
         class ConcreteProperty(AbstractProperty):
             pass
 
@@ -900,6 +944,7 @@ class TestAbstractPropertyInterface:
 
     def test_abstract_property_requires_header_with_context(self) -> None:
         """Subclasses must implement header_with_context."""
+
         class ConcreteProperty(AbstractProperty):
             @property
             def title(self) -> str:
@@ -915,6 +960,7 @@ class TestPinSubclassing:
 
     def test_pin_subclass_creation(self) -> None:
         """Can create custom pin subclasses."""
+
         class MyPin(pin):
             def custom_method(self) -> str:
                 return "custom"

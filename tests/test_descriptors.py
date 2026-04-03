@@ -9,11 +9,11 @@ from typing import Any
 import pytest
 
 from kain.descriptors import (
+    ContextFaultError,
+    ReadOnlyError,
     class_property,
     mixed_property,
     pin,
-    ContextFaultError,
-    ReadOnlyError,
 )
 
 
@@ -58,6 +58,7 @@ class TestPin:
 
     def test_rejects_async(self) -> None:
         with pytest.raises(TypeError):
+
             class Foo:
                 @pin
                 async def prop(self) -> int:

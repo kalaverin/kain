@@ -46,7 +46,7 @@ class TestIgnoredObjectFields:
             "__path__",
             "__spec__",
         }
-        assert IGNORED_OBJECT_FIELDS == expected
+        assert expected == IGNORED_OBJECT_FIELDS
 
 
 class TestPackagesMap:
@@ -78,7 +78,9 @@ class TestGetModule:
         """Should split module path from attribute path."""
         result = get_module("os.path.join")
         # Note: os.path is actually posixpath on Unix, so we get that module
-        assert result[0] is sys.modules.get("posixpath") or sys.modules.get("ntpath")
+        assert result[0] is sys.modules.get("posixpath") or sys.modules.get(
+            "ntpath",
+        )
         assert result[1] == ("join",)
 
     def test_nested_module(self):
@@ -103,11 +105,11 @@ class TestGetModule:
         """Should cache results."""
         # Clear cache before test
         get_module.cache_clear()
-        
+
         result1 = get_module("os")
         result2 = get_module("os")
         assert result1 is result2
-        
+
         # Check cache info
         cache_info = get_module.cache_info()
         assert cache_info.hits >= 1
@@ -119,21 +121,26 @@ class TestGetChild:
     def test_get_existing_attribute_from_module(self):
         """Should get existing attribute from module."""
         import os
+
         result = get_child("os.path", os, "path")
         assert result is os.path
 
     def test_get_existing_attribute_from_object(self):
         """Should get existing attribute from object."""
+
         class Obj:
             attr = 42
+
         obj = Obj()
         result = get_child("test", obj, "attr")
         assert result == 42
 
     def test_nonexistent_attribute_on_nonmodule(self):
         """Should raise ImportError for non-existent attr on non-module."""
+
         class Obj:
             pass
+
         obj = Obj()
         with pytest.raises(ImportError) as exc_info:
             get_child("test.path", obj, "nonexistent")
@@ -148,21 +155,22 @@ class TestGetChild:
         for attr in IGNORED_OBJECT_FIELDS:
             if attr != "__name__":
                 setattr(mock_module, attr, None)
-        
+
         # Verify __name__ is preserved
         assert mock_module.__name__ == "mock_module"
-        
+
         # Mock ismodule to return False to avoid __import__ call
         # This tests the "hasn't attribute" path for non-modules
         with patch.object(importer, "ismodule", return_value=False):
             with pytest.raises(ImportError) as exc_info:
                 get_child("mock_module.attr", mock_module, "attr")
-        
+
         assert "hasn't attribute" in str(exc_info.value)
 
     def test_nonexistent_attribute_on_module(self):
         """Should raise ImportError for non-existent module member."""
         import os
+
         with pytest.raises(ImportError) as exc_info:
             get_child("os.nonexistent_attr_xyz", os, "nonexistent_attr_xyz")
         assert "hasn't member" in str(exc_info.value)
@@ -170,6 +178,7 @@ class TestGetChild:
     def test_force_import_on_module(self):
         """Should trigger __import__ when parent is a module."""
         import os
+
         with patch("builtins.__import__") as mock_import:
             get_child("os.path", os, "path")
             # Verify __import__ was called with correct module name
@@ -191,13 +200,16 @@ class TestImportObject:
         """Should import attribute from module."""
         result = import_object("os.path.join")
         import os.path
+
         assert result is os.path.join
 
     def test_import_with_two_arguments(self):
         """Should accept path and object as separate arguments."""
         import os
+
         result = import_object("path.join", os)
         import os.path
+
         assert result is os.path.join
 
     def test_import_class_from_module(self):
@@ -224,8 +236,10 @@ class TestImportObject:
     def test_swapped_arguments(self):
         """Should swap arguments when first is not string."""
         import os
+
         result = import_object(os, "path.join")
         import os.path
+
         assert result is os.path.join
 
     def test_nonexistent_module_raises(self):
@@ -245,10 +259,10 @@ class TestCachedImport:
     def test_caches_result(self):
         """Should cache import results."""
         cached_import.cache_clear()
-        
+
         result1 = cached_import("os")
         result2 = cached_import("os")
-        
+
         assert result1 is result2
         assert cached_import.cache_info().hits >= 1
 
@@ -256,7 +270,7 @@ class TestCachedImport:
         """Should return same result as import_object."""
         cached = cached_import("os.path.join")
         direct = import_object("os.path.join")
-        
+
         assert cached is direct
 
 
@@ -272,6 +286,7 @@ class TestRequired:
         """Should import existing attribute successfully."""
         result = required("os.path.join")
         import os.path
+
         assert result is os.path.join
 
     def test_import_nonexistent_with_throw_true(self):
@@ -288,7 +303,9 @@ class TestRequired:
     def test_custom_default_value(self):
         """Should return custom default when throw=False."""
         default = object()
-        result = required("nonexistent_xyz_module", throw=False, default=default)
+        result = required(
+            "nonexistent_xyz_module", throw=False, default=default,
+        )
         assert result is default
 
     def test_quiet_suppresses_warning(self):
@@ -319,9 +336,10 @@ class TestRequired:
 
     def test_falls_back_to_import_object_on_typeerror(self):
         """Should fallback to import_object on TypeError."""
+
         def side_effect(*args, **kw):
             raise TypeError("test error")
-        
+
         with patch("kain.importer.cached_import", side_effect=side_effect):
             with patch("kain.importer.import_object") as mock_import:
                 mock_import.return_value = "result"
@@ -470,16 +488,16 @@ class TestAddPath:
     def test_add_directory_to_sys_path(self):
         """Should add directory to sys.path."""
         test_path = Path("/tmp/test_add_path_xyz")
-        
+
         # Ensure path doesn't exist initially
         if str(test_path) in sys.path:
             sys.path.remove(str(test_path))
         if str(test_path.resolve()) in sys.path:
             sys.path.remove(str(test_path.resolve()))
-        
+
         # Create the directory for the test
         test_path.mkdir(parents=True, exist_ok=True)
-        
+
         try:
             result = add_path(test_path)
             resolved = str(result.resolve())
@@ -495,16 +513,16 @@ class TestAddPath:
         """Should use parent directory when path is a file."""
         test_dir = Path("/tmp/test_add_path_dir")
         test_file = test_dir / "file.py"
-        
+
         # Create test directory and file
         test_dir.mkdir(parents=True, exist_ok=True)
         test_file.touch()
-        
+
         # Ensure paths don't exist initially
         for p in [str(test_dir), str(test_file), str(test_dir.resolve())]:
             if p in sys.path:
                 sys.path.remove(p)
-        
+
         try:
             result = add_path(test_file)
             assert result.resolve() == test_dir.resolve()
@@ -522,14 +540,14 @@ class TestAddPath:
         """Should not duplicate existing paths in sys.path."""
         test_path = Path("/tmp/test_add_path_dup")
         test_path.mkdir(parents=True, exist_ok=True)
-        
+
         # Ensure path is in sys.path initially
         str_path = str(test_path.resolve())
         if str_path not in sys.path:
             sys.path.append(str_path)
-        
+
         original_len = len(sys.path)
-        
+
         try:
             add_path(test_path)
             assert len(sys.path) == original_len
@@ -542,7 +560,7 @@ class TestAddPath:
         """Should resolve relative paths."""
         with patch("kain.importer.get_path") as mock_get_path:
             mock_get_path.return_value = Path("/resolved/path")
-            
+
             result = add_path("../some/path")
             assert mock_get_path.called
             assert result == Path("/resolved/path")
@@ -551,12 +569,12 @@ class TestAddPath:
         """Should log info about added path."""
         test_path = Path("/tmp/test_add_path_log")
         test_path.mkdir(parents=True, exist_ok=True)
-        
+
         # Clean up any existing entries
         for p in list(sys.path):
             if "test_add_path_log" in p:
                 sys.path.remove(p)
-        
+
         try:
             with patch.object(importer.logger, "info") as mock_info:
                 add_path(test_path)
@@ -573,7 +591,7 @@ class TestAddPath:
         """Should raise ValueError when get_path returns empty."""
         with patch("kain.importer.get_path") as mock_get_path:
             mock_get_path.return_value = None
-            
+
             with pytest.raises(ValueError) as exc_info:
                 add_path("relative/path")
             assert "not found" in str(exc_info.value)
@@ -586,6 +604,7 @@ class TestEdgeCases:
         """Should handle deeply nested attribute paths."""
         result = import_object("os.path.dirname")
         import os.path
+
         assert result is os.path.dirname
 
     def test_required_with_extra_kwargs(self):
@@ -619,21 +638,21 @@ class TestEdgeCases:
         for attr in IGNORED_OBJECT_FIELDS:
             if attr != "__name__":
                 setattr(mock_module, attr, None)
-        
+
         # Verify __name__ is still valid
         assert mock_module.__name__ == "test_module"
-        
+
         # Patch get_module to return our mock, and ismodule to avoid __import__
         # We patch at the importer module level where ismodule is imported to
         with patch("kain.importer.get_module") as mock_get_module:
             with patch.object(importer, "ismodule", return_value=False):
                 mock_get_module.return_value = (mock_module, ("attr",))
-                
+
                 # When ismodule is False, it tries to get attribute from object
                 # Since mock_module has no 'attr', it raises "hasn't attribute"
                 with pytest.raises(ImportError) as exc_info:
                     import_object("test_module.attr")
-                
+
                 assert "hasn't attribute" in str(exc_info.value)
 
 
@@ -645,11 +664,11 @@ class TestIntegration:
         # Import os module
         os_module = required("os")
         assert isinstance(os_module, ModuleType)
-        
+
         # Import path attribute
         path_module = required("os.path")
         assert path_module is os_module.path
-        
+
         # Import join function
         join_func = required("os.path.join")
         assert callable(join_func)
@@ -666,19 +685,19 @@ class TestIntegration:
         root = Path("/tmp/test_integration")
         subdir = root / "subdir"
         subdir.mkdir(parents=True, exist_ok=True)
-        
+
         # Clean up any existing entries
         for p in list(sys.path):
             if "test_integration" in p:
                 sys.path.remove(p)
-        
+
         try:
             # Use get_path to find the subdirectory
             # Note: get_path with a directory name searches up the tree
             # So we use "subdir" which is a child of root
             result = get_path("subdir", root=subdir)
             assert result == subdir
-            
+
             # Add to sys.path
             result = add_path(subdir)
             resolved = str(result.resolve())

@@ -249,6 +249,7 @@ def get_module_name(x: Any) -> str | None:
 
 def object_name(obj: Any, full: bool = True) -> str:
     """Build a readable, fully-qualified name for *obj*."""
+
     def post(x: str) -> str:
         return sub(
             r"^([\?\.]+)",
@@ -390,6 +391,7 @@ def simple_repr(x: Any) -> bool | str | None:
 
 def format_args_and_keywords(*args: Any, **kw: Any) -> str:
     """Pretty-print positional and keyword arguments."""
+
     def format_args(x: tuple[Any, ...]) -> str:
         return repr(tuple(map(simple_repr, x)))[1:-1].rstrip(",")
 

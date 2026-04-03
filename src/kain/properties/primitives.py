@@ -36,9 +36,7 @@ from kain.internals import (
     get_attr,
 )
 
-__all__ = (
-    "bound_property",
-)
+__all__ = ("bound_property",)
 
 # Sentinel used throughout the package to mean "no value / not provided".
 # It is deliberately truthy-false (``bool(Missing()) == False``) so it can
@@ -205,6 +203,7 @@ def parent_call(func):
     callable
         A wrapper that supplies ``func(node, parent_value, *args, **kw)``.
     """
+
     @wraps(func)
     def parent_caller(node, *args, **kw):
         try:
@@ -253,6 +252,7 @@ def invoсation_context_check(func):
     ContextFaultError
         If the context does not match ``self.klass``.
     """
+
     @wraps(func)
     def context(self, node, *args, **kw):
         if (klass := self.klass) is not None and (
@@ -349,8 +349,7 @@ class BaseProperty:
             mode = ("instance", "class")[Is.Class(node)]
 
         return (
-            f"{self.header} called with "
-            f"{mode} context ({Who.Addr(node)})"
+            f"{self.header} called with {mode} context ({Who.Addr(node)})"
         )
 
     @override

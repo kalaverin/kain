@@ -81,7 +81,7 @@ class TestMonkeyPatch:
         original.__name__ = "original_attr"
         replacement = MagicMock()
         replacement.__name__ = "original_attr"
-        setattr(mod, "original_attr", original)
+        mod.original_attr = original
 
         def fake_required(path: object, *args: object) -> object:
             if args:
@@ -93,17 +93,17 @@ class TestMonkeyPatch:
                 result = Monkey.patch(mod, replacement)
 
         assert result is replacement
-        assert getattr(mod, "original_attr") is replacement
+        assert mod.original_attr is replacement
         assert Monkey.mapping[replacement] is original
 
         # Restore
-        setattr(mod, "original_attr", Monkey.mapping.pop(replacement))
+        mod.original_attr = Monkey.mapping.pop(replacement)
 
     def test_patch_with_string_path(self) -> None:
         """Should patch an attribute specified by dotted string path."""
         mod = types.ModuleType("test_patch_mod")
         original = lambda: "old"  # noqa: E731
-        setattr(mod, "func", original)
+        mod.func = original
         replacement = lambda: "new"  # noqa: E731
 
         def fake_required(path: object, *args: object) -> object:
@@ -115,11 +115,11 @@ class TestMonkeyPatch:
             result = Monkey.patch("test_patch_mod.func", replacement)
 
         assert result is replacement
-        assert getattr(mod, "func") is replacement
+        assert mod.func is replacement
         assert Monkey.mapping[replacement] is original
 
         # Restore
-        setattr(mod, "func", Monkey.mapping.pop(replacement))
+        mod.func = Monkey.mapping.pop(replacement)
 
     def test_patch_returns_same_if_already_set(self) -> None:
         """Should return new immediately if it is already the attribute."""

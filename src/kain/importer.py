@@ -337,7 +337,9 @@ sort: Callable[..., list[object]] = optional(
 )
 
 
-def get_path(path: str | Path, root: str | Path | None = None) -> Path:  # noqa: PLR0912
+def get_path(
+    path: str | Path, root: str | Path | None = None,
+) -> Path:
     """Resolve a path relative to a root directory.
 
     Supports multiple path formats:
