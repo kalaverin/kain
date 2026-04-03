@@ -1,3 +1,22 @@
+"""Dynamic import utilities and path management for kain.
+
+This module provides utilities for:
+- Dynamic importing of modules, classes, functions, and attributes
+- Safe optional imports with fallback defaults
+- Path resolution and sys.path manipulation
+
+The main functions are:
+    - required(): Import with mandatory success or exception
+    - optional(): Import with graceful fallback to default
+    - add_path(): Add resolved paths to sys.path
+
+Example:
+    >>> from kain.importer import required, optional, add_path
+    >>> os_path = required('os.path')
+    >>> natsort = optional('natsort.natsorted', default=sorted)
+    >>> add_path('..')  # Add parent directory to sys.path
+"""
+
 import sys
 from contextlib import suppress
 from functools import cache
@@ -9,11 +28,12 @@ from pathlib import Path
 
 from kain.internals import Who, iter_stack, to_ascii, unique
 
-__all__ = "add_path", "optional", "required"
+__all__ = ("add_path", "optional", "required")
 
 logger = getLogger(__name__)
 
-
+#: Module attribute names to ignore when checking for circular imports.
+#: These are standard dunder attributes present on all modules.
 IGNORED_OBJECT_FIELDS = {
     "__builtins__",
     "__cached__",
@@ -26,12 +46,37 @@ IGNORED_OBJECT_FIELDS = {
     "__spec__",
 }
 
+#: Mapping of import names to their PyPI package names.
+#: Used to provide helpful error messages when optional dependencies
+#: are not installed.
 PACKAGES_MAP = {"magic": "python-magic", "git": "gitpython"}
 
 
 @cache
-def get_module(path):
+def get_module(path: str) -> tuple[object, tuple[str, ...]]:
+    """Import a module and return remaining attribute path components.
 
+    Attempts to import the longest possible module prefix from a dot-
+    separated path, returning the imported module and any remaining
+    attribute path components.
+
+    Args:
+        path: Dot-separated import path (e.g., ``os.path.join``).
+
+    Returns:
+        A tuple of ``(module, remaining_path_components)`` where
+        ``module`` is the imported module and ``remaining_path_components``
+        is a tuple of attribute names to traverse.
+
+    Raises:
+        ImportError: If no module prefix can be imported.
+
+    Example:
+        >>> get_module("os.path.join")
+        (<module 'posixpath' ...>, ('join',))
+        >>> get_module("kain.importer")
+        (<module 'kain.importer' ...>, ())
+    """
     chunks = path.split(".")
     count = len(chunks) + 1
 
@@ -48,7 +93,26 @@ def get_module(path):
     raise ImportError(msg)
 
 
-def get_child(path, parent, child):
+def get_child(path: str, parent: object, child: str) -> object:
+    """Get an attribute from a parent object with enhanced error messages.
+
+    If ``parent`` is a module, attempts to import ``child`` from it first
+    using ``__import__`` to ensure submodules are loaded.
+
+    Args:
+        path: The full import path (for error messages).
+        parent: The object to get the attribute from.
+        child: The attribute name to retrieve.
+
+    Returns:
+        The attribute value.
+
+    Raises:
+        ImportError: If the attribute doesn't exist. The error message
+        includes context about whether the parent is a module, and may
+        suggest a circular import if the module appears to be partially
+        initialized (has no public attributes).
+    """
     if ismodule(parent):
         __import__(parent.__name__, globals(), locals(), [str(child)])
 
@@ -75,7 +139,34 @@ def get_child(path, parent, child):
     return getattr(parent, child)
 
 
-def import_object(path, something=None):
+def import_object(path: str | bytes | None, something: object = None) -> object:
+    """Dynamically import an object by its fully-qualified name.
+
+    Supports importing:
+    - Entire modules (``os``, ``kain.importer``)
+    - Module attributes (``os.path.join``, ``kain.importer.required``)
+    - Attributes from given parent objects
+
+    Args:
+        path: The import path. Can be a string, bytes, or if ``something``
+            is provided, can be any object with the path as second argument.
+        something: Optional parent object. If provided, ``path`` is treated
+            as an attribute path relative to this object.
+
+    Returns:
+        The imported object (module, class, function, etc.).
+
+    Raises:
+        TypeError: If both arguments are None, or if path is not a string
+            and something is None.
+        ImportError: If the module or attribute cannot be found.
+
+    Example:
+        >>> import_object("os.path.join")
+        <function join at ...>
+        >>> import_object("path.join", os)
+        <function join at ...>
+    """
     if path is something is None:
         raise TypeError("all arguments is None")
 
@@ -120,17 +211,51 @@ def import_object(path, something=None):
 
 
 @cache
-def cached_import(*args, **kw):
+def cached_import(*args: object, **kw: object) -> object:
+    """Cached version of :func:`import_object`.
+
+    Uses :func:`functools.cache` to memoize import results. Subsequent
+    calls with the same arguments return the cached result.
+
+    Args:
+        *args: Positional arguments passed to :func:`import_object`.
+        **kw: Keyword arguments passed to :func:`import_object`.
+
+    Returns:
+        The imported (and cached) object.
+    """
     return import_object(*args, **kw)
 
 
-def required(path, *args, **kw):
-    """For dynamic import any from any, usage:
+def required(path: str, *args: object, **kw: object) -> object:
+    """Import an object, requiring it to exist.
 
-    required('kain.importer.required')  # import kain.importer and return function
+    Attempts to import the object at ``path``. If the import fails,
+    behavior is controlled by the ``throw`` and ``quiet`` parameters.
 
+    Args:
+        path: The import path (e.g., ``os.path.join``).
+        *args: Additional positional arguments passed to import functions.
+        throw: If True (default), raise ImportError on failure.
+            If False, return ``default`` on failure.
+        quiet: If True, suppress warning log on failure.
+            If False (default), log a warning on failure.
+        default: Value to return on failure when ``throw=False``.
+        **kw: Additional keyword arguments passed to import functions.
+
+    Returns:
+        The imported object, or ``default`` if import failed and
+        ``throw=False``.
+
+    Raises:
+        ImportError: If import fails and ``throw=True``.
+
+    Example:
+        >>> required("os.path.join")
+        <function join at ...>
+        >>> required("nonexistent", throw=False, default="fallback")
+        'fallback'
     """
-
     throw = kw.pop("throw", True)
     quiet = kw.pop("quiet", False)
     default = kw.pop("default", None)
@@ -161,17 +286,60 @@ def required(path, *args, **kw):
     return default
 
 
-def optional(path, *args, **kw):
+def optional(path: str, *args: object, **kw: object) -> object:
+    """Import an object optionally, returning None on failure.
+
+    Convenience wrapper around :func:`required` with ``quiet=True``
+    and ``throw=False`` by default.
+
+    Args:
+        path: The import path.
+        *args: Additional positional arguments passed to :func:`required`.
+        **kw: Additional keyword arguments passed to :func:`required`.
+            Defaults: ``quiet=True``, ``throw=False``.
+
+    Returns:
+        The imported object, or ``default`` if specified and import failed,
+        or None if import failed and no default specified.
+
+    Example:
+        >>> optional("natsort.natsorted", default=sorted)
+        <built-in function sorted>
+        >>> optional("nonexistent_module")
+        None
+    """
     kw.setdefault("quiet", True)
     kw.setdefault("throw", False)
     return required(path, *args, **kw)
 
 
+#: Natural sort function if ``natsort`` is installed, otherwise
+#: falls back to built-in :func:`sorted`.
 sort = optional("natsort.natsorted", quiet=True, default=sorted)
 
 
-def get_path(path, root=None):  # noqa: PLR0912
+def get_path(path: str | Path, root: str | Path | None = None) -> Path:  # noqa: PLR0912
+    """Resolve a path relative to a root directory.
 
+    Supports multiple path formats:
+    - ``.``: Returns as-is (current directory reference)
+    - ``..``, ``...``, etc.: Go up N-1 parent directories from root
+    - ``../foo``: Resolve relative to root
+    - ``subdir/name``: Extract path segment from root string
+    - ``dirname``: Walk up from root looking for directory name
+
+    Args:
+        path: The path to resolve. Can be string or Path.
+        root: The root directory to resolve from. If None, uses the
+            directory of the calling module.
+
+    Returns:
+        The resolved absolute Path.
+
+    Raises:
+        TypeError: If root is not str, Path, or None.
+        ValueError: If the path cannot be resolved.
+    """
     if root is None:
 
         base = Path(__file__).stem
@@ -192,7 +360,7 @@ def get_path(path, root=None):  # noqa: PLR0912
     if set(spath) == {"."}:
         dots = len(spath) - 2
         if dots == -1:
-            return path
+            return Path(path)
 
         path = root.resolve()
         for _ in range(dots + 1):
@@ -203,7 +371,7 @@ def get_path(path, root=None):  # noqa: PLR0912
     if spath.startswith("../"):
         return (root / path).resolve()
 
-    if sep in path and ("../" not in spath and "/.." not in spath):
+    if sep in str(path) and ("../" not in spath and "/.." not in spath):
         try:
             idx = str(root).index(str(path))
         except ValueError as e:
@@ -222,18 +390,33 @@ def get_path(path, root=None):  # noqa: PLR0912
     raise ValueError(f"{path=} not found in {root=}")
 
 
-def add_path(path, **kw):
-    """Add resolved path to sys.path and return Path object, usage:
+def add_path(path: str | Path, **kw: object) -> Path:
+    """Add a resolved path to ``sys.path``.
 
-    add_path('..')      # ../
-    add_path('...')     # ../../
-    add_path('....')    # ../../../
+    Resolves the given path and adds it to ``sys.path`` if not already
+    present. Handles relative paths, file paths, and dot notation for
+    parent directories.
 
-    app_path(__file__)  # add current file directory to sys.path
-    app_path('/etc/hosts')  # add /etc to sys.path, hosts is file
+    Args:
+        path: The path to add. Can be:
+            - ``..``, ``...``, etc. - parent directories
+            - A file path - adds the parent directory
+            - A relative path - resolved using :func:`get_path`
+            - An absolute path - used as-is
+        **kw: Additional arguments passed to :func:`get_path`.
 
+    Returns:
+        The resolved Path that was added (or was already present).
+
+    Raises:
+        ValueError: If the path cannot be resolved.
+
+    Example:
+        >>> add_path('..')      # Add parent directory
+        PosixPath('/home/user/project')
+        >>> add_path('src')     # Resolve and add 'src' directory
+        PosixPath('/home/user/project/src')
     """
-
     path = Path(path)
     request = path
 
@@ -243,11 +426,12 @@ def add_path(path, **kw):
     elif not (str(path).startswith(sep) or path == path.resolve()):
         root = get_path(path, **kw)
         if not root:
-            raise ValueError(f"{path=} not found, {logger.Args(**kw)}")
+            raise ValueError(f"{path=} not found, {Who.Args(**kw)}")
         path = root if str(path).startswith(".") else (root / path).resolve()
 
-    if path not in sys.path:
-        sys.path.append(str(path.resolve()))
+    str_path = str(path.resolve())
+    if str_path not in sys.path:
+        sys.path.append(str_path)
         sys.path = list(unique(sys.path))
         exists = path.is_dir()
         logger.info(f"path {request} resolved to {path}, {exists=}")
