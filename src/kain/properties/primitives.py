@@ -303,6 +303,20 @@ class BaseProperty:
         return self.function.__name__
 
     @cached_property
+    def is_data(self) -> bool:
+        """Return ``True`` if this descriptor defines ``__set__`` or ``__delete__``.
+
+        Data descriptors (like ``bound_property`` and the cached family)
+        take precedence over instance ``__dict__`` entries in the attribute
+        lookup chain. Non-data descriptors (like ``class_property`` and
+        ``mixed_property``) do not.
+        """
+        return hasattr(type(self), "__set__") or hasattr(
+            type(self),
+            "__delete__",
+        )
+
+    @cached_property
     def title(self) -> str:
         """Short human-readable label for this descriptor type.
 
