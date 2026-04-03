@@ -31,6 +31,9 @@ from kain.properties.primitives import (
     ReadOnlyError,
     bound_property,
 )
+from kain.properties.proxy_to import (
+    proxy_to,
+)
 
 __all__ = (
     "AttributeException",
@@ -51,6 +54,7 @@ __all__ = (
     "post_parent_cached_property",
     "pre_cached_property",
     "pre_parent_cached_property",
+    "proxy_to",
 )
 
 
