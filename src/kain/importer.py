@@ -18,6 +18,7 @@ Example:
 """
 
 import sys
+from collections.abc import Callable
 from contextlib import suppress
 from functools import cache
 from importlib import import_module
@@ -25,6 +26,8 @@ from inspect import ismodule
 from logging import getLogger
 from os import sep
 from pathlib import Path
+from types import ModuleType
+from typing import overload
 
 from kain.internals import Who, iter_stack, to_ascii, unique
 
@@ -34,7 +37,7 @@ logger = getLogger(__name__)
 
 #: Module attribute names to ignore when checking for circular imports.
 #: These are standard dunder attributes present on all modules.
-IGNORED_OBJECT_FIELDS = {
+IGNORED_OBJECT_FIELDS: set[str] = {
     "__builtins__",
     "__cached__",
     "__doc__",
@@ -49,11 +52,11 @@ IGNORED_OBJECT_FIELDS = {
 #: Mapping of import names to their PyPI package names.
 #: Used to provide helpful error messages when optional dependencies
 #: are not installed.
-PACKAGES_MAP = {"magic": "python-magic", "git": "gitpython"}
+PACKAGES_MAP: dict[str, str] = {"magic": "python-magic", "git": "gitpython"}
 
 
 @cache
-def get_module(path: str) -> tuple[object, tuple[str, ...]]:
+def get_module(path: str) -> tuple[ModuleType, tuple[str, ...]]:
     """Import a module and return remaining attribute path components.
 
     Attempts to import the longest possible module prefix from a dot-
@@ -139,7 +142,18 @@ def get_child(path: str, parent: object, child: str) -> object:
     return getattr(parent, child)
 
 
-def import_object(path: str | bytes | None, something: object = None) -> object:
+@overload
+def import_object(path: str | bytes, something: None = None) -> object: ...
+
+
+@overload
+def import_object(path: str | bytes, something: object) -> object: ...
+
+
+def import_object(
+    path: str | bytes | None,
+    something: object = None,
+) -> object:
     """Dynamically import an object by its fully-qualified name.
 
     Supports importing:
@@ -258,7 +272,7 @@ def required(path: str, *args: object, **kw: object) -> object:
     """
     throw = kw.pop("throw", True)
     quiet = kw.pop("quiet", False)
-    default = kw.pop("default", None)
+    default: object = kw.pop("default", None)
 
     try:
         try:
@@ -275,7 +289,7 @@ def required(path: str, *args: object, **kw: object) -> object:
             base = path.split(".", 1)[0]
             if base not in sys.modules:
                 package = (PACKAGES_MAP.get(base) or base).replace("_", "-")
-                msg = f"{msg}; (need extra {package=}?)"
+                msg = f"{msg}; (need extra package={package!r})"
 
             if not quiet:
                 logger.warning(msg)
@@ -295,6 +309,7 @@ def optional(path: str, *args: object, **kw: object) -> object:
     Args:
         path: The import path.
         *args: Additional positional arguments passed to :func:`required`.
+        default: Value to return on failure.
         **kw: Additional keyword arguments passed to :func:`required`.
             Defaults: ``quiet=True``, ``throw=False``.
 
@@ -315,7 +330,11 @@ def optional(path: str, *args: object, **kw: object) -> object:
 
 #: Natural sort function if ``natsort`` is installed, otherwise
 #: falls back to built-in :func:`sorted`.
-sort = optional("natsort.natsorted", quiet=True, default=sorted)
+sort: Callable[..., list[object]] = optional(
+    "natsort.natsorted",
+    quiet=True,
+    default=sorted,
+)
 
 
 def get_path(path: str | Path, root: str | Path | None = None) -> Path:  # noqa: PLR0912
