@@ -1,5 +1,7 @@
-"""Public API for the ``kain`` utility library."""
-
+from kain import (
+    Is,
+    Who,
+)
 from kain.classes import (
     Missing,
     Nothing,
@@ -8,11 +10,8 @@ from kain.importer import (
     add_path,
     optional,
     required,
-    sort,
 )
 from kain.internals import (
-    Is,
-    Who,
     to_ascii,
     to_bytes,
     unique,
@@ -21,7 +20,6 @@ from kain.monkey import (
     Monkey,
 )
 from kain.properties import (
-    cache,
     class_property,
     mixed_property,
     pin,
@@ -38,7 +36,6 @@ __all__ = (
     "Nothing",
     "Who",
     "add_path",
-    "cache",
     "class_property",
     "mixed_property",
     "on_quit",
@@ -46,7 +43,6 @@ __all__ = (
     "pin",
     "quit_at",
     "required",
-    "sort",
     "to_ascii",
     "to_bytes",
     "unique",

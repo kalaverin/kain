@@ -9,28 +9,27 @@ be readable directly from the class (e.g. for introspection or default-value
 inspection) without polluting the class-level cache.
 """
 
+# ruff: noqa: N801
+
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any, Generic, TypeVar, overload, override
+from typing import Any, TypeVar, override
 
-from kain.internals import Is
+from kain import Is
 from kain.properties.cached.klass import class_cached_property
 from kain.properties.cached.mixed import (
     mixed_cached_property,
     mixed_parent_cached_property,
 )
 
-__all__ = (
-    "post_cached_property",
-    "post_parent_cached_property",
-)
+__all__ = ("post_cached_property", "post_parent_cached_property")
 
-T = TypeVar("T")
-R = TypeVar("R")
+T_co = TypeVar("T_co", covariant=True)
 
 
-class post_parent_cached_property(mixed_parent_cached_property[T, R]):
+class post_parent_cached_property[T_co](
+    mixed_parent_cached_property[T_co],
+):
     """Mixed parent-cached descriptor that skips class caching.
 
     Overrides ``__set__`` so that when ``node`` is a class, the value is
@@ -39,53 +38,32 @@ class post_parent_cached_property(mixed_parent_cached_property[T, R]):
     """
 
     @override
-    def __set__(self, node: object, value: R) -> R:
-        """Skip class caching; store directly on the instance."""
+    def __set__(self, node: Any, value: Any) -> Any:
         self.get_node(node)
         if Is.Class(node):
-            # Class access: return the fresh value, do not memoize.
             return value
         return super().__set__(node, value)
 
 
-class post_cached_property(mixed_cached_property[T, R], Generic[T, R]):
+class post_cached_property[T_co](
+    mixed_cached_property[T_co],
+):
     """Mixed cached descriptor that skips class caching.
 
     Same semantics as ``post_parent_cached_property`` but caches directly on
     the accessed instance without owner-resolution for the class side.
     """
 
-    @overload
-    def __new__(
-        cls,
-        function: Callable[[T], R],
-        **kw: object,
-    ) -> post_cached_property[T, R]: ...
-    @overload
-    def __new__(
-        cls,
-        function: Callable[..., R],
-        **kw: object,
-    ) -> post_cached_property[Any, R]: ...
-    def __new__(
-        cls,
-        *args: object,
-        **kw: object,
-    ) -> post_cached_property[Any, R]:
-        """Skip class caching; return fresh values on classes."""
-        return object.__new__(cls)
-
     @override
-    def __set__(self, node: object, value: R) -> R:
-        """Skip class caching; return fresh values on classes."""
+    def __set__(self, node: Any, value: Any) -> Any:
         self.get_node(node)
         if Is.Class(node):
             return value
         return super().__set__(node, value)
 
     @class_cached_property
-    def here(
-        cls: type[post_parent_cached_property[Any, Any]],
-    ) -> type[post_parent_cached_property[Any, Any]]:
-        """Return the parent cached-property class this variant inherits from."""
+    @override
+    def here(  # pyrefly: ignore[missing-override-decorator]
+        cls,  # noqa: N805
+    ) -> type[post_parent_cached_property[Any]]:
         return post_parent_cached_property

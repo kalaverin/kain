@@ -28,14 +28,14 @@ class TestPropertiesAll:
         assert isinstance(properties.__all__, tuple)
 
     def test_all_length(self) -> None:
-        assert len(properties.__all__) == 20
+        assert len(properties.__all__) == 19
 
     def test_all_has_no_duplicates(self) -> None:
         assert len(properties.__all__) == len(set(properties.__all__))
 
     def test_all_matches_expected(self) -> None:
         expected = {
-            "AttributeException",
+            "AttributeExceptionError",
             "BaseProperty",
             "ContextFaultError",
             "PropertyError",
@@ -54,7 +54,6 @@ class TestPropertiesAll:
             "pre_cached_property",
             "pre_parent_cached_property",
             "proxy_to",
-            "cache",
         }
         assert set(properties.__all__) == expected
 
@@ -148,7 +147,7 @@ class TestPropertiesExports:
 
     def test_attribute_exception_inheritance(self) -> None:
         assert issubclass(
-            properties.AttributeException,
+            properties.AttributeExceptionError,
             properties.PropertyError,
         )
 

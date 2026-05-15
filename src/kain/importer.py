@@ -18,7 +18,6 @@ Example:
 """
 
 import sys
-from collections.abc import Callable
 from contextlib import suppress
 from functools import cache
 from importlib import import_module
@@ -29,7 +28,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import overload
 
-from kain.internals import Who, iter_stack, to_ascii, unique
+from kain import Who
+from kain.internals import iter_stack, to_ascii, unique
 
 __all__ = ("add_path", "optional", "required")
 
@@ -53,6 +53,8 @@ IGNORED_OBJECT_FIELDS: set[str] = {
 #: Used to provide helpful error messages when optional dependencies
 #: are not installed.
 PACKAGES_MAP: dict[str, str] = {"magic": "python-magic", "git": "gitpython"}
+
+SINGLE_COMPONENT = 2
 
 
 @cache
@@ -83,10 +85,11 @@ def get_module(path: str) -> tuple[ModuleType, tuple[str, ...]]:
     chunks = path.split(".")
     count = len(chunks) + 1
 
-    if count == 2:  # noqa: PLR2004
+    if count == SINGLE_COMPONENT:
         with suppress(ModuleNotFoundError):
             return import_module(path), ()
 
+    chunk = path
     for i in range(1, count):
         chunk = ".".join(chunks[: count - i])
         with suppress(ModuleNotFoundError):
@@ -197,19 +200,21 @@ def import_object(
                 f"second argument (import path) is None"
             )
             raise TypeError(msg)
-        path, something = something, path
+        path, something = something, path  # type: ignore[assignment]  # pyrefly: ignore[bad-assignment]  # pyright: ignore[reportAssignmentType]
 
     logger.debug(f"lookup: {path}")
 
     if something:
         locator = f"{Who.Is(something)}.{path}"
-        sequence = path.split(".")
+        sequence = path.split(".")  # type: ignore[union-attr]  # pyrefly: ignore[missing-attribute]  # pyright: ignore[reportOptionalMemberAccess, reportArgumentType]
 
     else:
         locator = str(path)
+        if path is None:
+            raise TypeError("path is required")
         something, sequence = get_module(path)
 
-        if something is None:
+        if something is None:  # type: ignore[redundant-expr]  # pyright: ignore[reportUnnecessaryComparison]
             raise ImportError(f"{path} (isn't exists?)")
 
     if not sequence:
@@ -217,11 +222,16 @@ def import_object(
 
     else:
         logger.debug(
-            f'split path: {Who.Is(something)} (module) -> {".".join(sequence)} (path)',
+            f"split path: {Who.Is(something)} (module) "
+            f'-> {".".join(sequence)} (path)',  # pyright: ignore[reportCallIssue, reportArgumentType]
         )
 
     for name in sequence:
-        something = get_child(locator, something, name)
+        something = get_child(
+            locator,
+            something,
+            name,  # pyright: ignore[reportArgumentType]
+        )
 
     logger.debug("load ok: %s", path)
     return something
@@ -244,7 +254,7 @@ def cached_import(*args: object, **kw: object) -> object:
     Example:
         >>> cached_import("os.path.join")
     """
-    return import_object(*args, **kw)
+    return import_object(*args, **kw)  # type: ignore[call-overload]  # pyrefly: ignore[no-matching-overload]  # pyright: ignore[reportCallIssue, reportArgumentType]
 
 
 def required(path: str, *args: object, **kw: object) -> object:
@@ -340,16 +350,7 @@ def optional(path: str, *args: object, **kw: object) -> object:
     return required(path, *args, **kw)
 
 
-#: Natural sort function if ``natsort`` is installed, otherwise
-#: falls back to built-in :func:`sorted`.
-sort: Callable[..., list[object]] = optional(
-    "natsort.natsorted",
-    quiet=True,
-    default=sorted,
-)
-
-
-def get_path(
+def get_path(  # noqa: PLR0912
     path: str | Path,
     root: str | Path | None = None,
 ) -> Path:
@@ -384,16 +385,18 @@ def get_path(
     if root is None:
 
         base = Path(__file__).stem
+        file = ""
         for file in iter_stack(1, offset=1):
             if Path(file).stem != base:
                 break
         root = Path(file).parent
 
-    if isinstance(root, Path | str):
+    if isinstance(root, Path | str):  # type: ignore[redundant-expr]  # pyright: ignore[reportUnnecessaryIsInstance]
         root = Path(root)
     else:
         raise TypeError(
-            f"root={root!r} can be str | {Who.Is(Path)} | None, not {Who.Is(root)}",
+            f"root={root!r} can be str | {Who.Is(Path)} | None, "
+            f"not {Who.Is(root)}",
         )
 
     spath = str(path).strip("/")
@@ -465,8 +468,8 @@ def add_path(path: str | Path, **kw: object) -> Path:
         path = path.resolve().parent
 
     elif not (str(path).startswith(sep) or path == path.resolve()):
-        root = get_path(path, **kw)
-        if not root:
+        root = get_path(path, **kw)  # type: ignore[arg-type]  # pyrefly: ignore[bad-argument-type]  # pyright: ignore[reportArgumentType]
+        if not root:  # type: ignore[truthy-bool]
             raise ValueError(f"{path=} not found, {Who.Args(**kw)}")
         path = root if str(path).startswith(".") else (root / path).resolve()
 

@@ -3,7 +3,8 @@
 This module provides mechanisms for:
 
 * **Graceful shutdown on signals** - ``on_quit`` singleton that schedules
-callbacks and ensures they run on SIGINT/SIGTERM/SIGQUIT or uncaught exceptions.
+callbacks and ensures they run on SIGINT/SIGTERM/SIGQUIT
+or uncaught exceptions.
 * **File-change detection** - ``quit_at`` polls the main script's mtime and
 exits when it changes (useful for development auto-reloaders).
 
@@ -19,6 +20,8 @@ Example:
     ...     pass
 """
 
+# ruff: noqa: ANN401
+
 import atexit
 import signal
 import sys
@@ -26,7 +29,7 @@ import threading
 import time
 import warnings
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import cache
 from logging import getLogger
 from pathlib import Path
@@ -34,8 +37,8 @@ from signal import signal as bind
 from types import FrameType, TracebackType
 from typing import Any, Protocol
 
+from kain import Who
 from kain.classes import Singleton
-from kain.internals import Who
 
 __all__ = (
     "on_quit",
@@ -60,7 +63,7 @@ class _OnChangeCallable(Protocol):
     sleep: Callable[[float, float], bool]
 
 
-class on_quit(metaclass=Singleton):
+class on_quit(metaclass=Singleton):  # noqa: N801
     """Singleton orchestrator for graceful application shutdown.
 
     ``on_quit`` registers itself with ``atexit``, replaces ``sys.excepthook``,
@@ -100,7 +103,7 @@ class on_quit(metaclass=Singleton):
         self.already_called: bool = False
 
         #: Bound method reference for use as ``sys.excepthook`` replacement.
-        self._proxy = self.exceptions_hooks_proxy
+        self._proxy: Callable[..., Any] = self.exceptions_hooks_proxy
 
         self.inject_hook()
         self.inject_signal_handler()
@@ -178,9 +181,11 @@ class on_quit(metaclass=Singleton):
         Args:
             args: The exception hook arguments.
         """
-        if args.exc_type is None or args.exc_type is SystemExit:
+        if args.exc_type is None or args.exc_type is SystemExit:  # type: ignore[redundant-expr]  # pyright: ignore[reportUnnecessaryComparison]
             return
 
+        if args.exc_value is None:
+            return
         self._proxy(
             args.exc_type,
             args.exc_value,
@@ -198,7 +203,7 @@ class on_quit(metaclass=Singleton):
         bind(signal.SIGQUIT, signal.SIG_DFL)
 
         sys.excepthook = self.original_hook
-        threading.excepthook = threading.__excepthook__
+        threading.excepthook = threading.__excepthook__  # type: ignore[attr-defined]
 
     def schedule(self, func: Callable[[], Any]) -> None:
         """Register a callback to be executed during teardown.
@@ -256,12 +261,10 @@ class on_quit(metaclass=Singleton):
 
 @cache
 def get_selfpath() -> Path:
-    """Return the resolved Path of ``sys.argv[0]`` (the running script)."""
     return Path(sys.argv[0]).resolve()
 
 
 def get_mtime() -> float:
-    """Return the mtime (modification timestamp) of the running script."""
     return get_selfpath().stat().st_mtime
 
 
@@ -335,7 +338,7 @@ def quit_at(
         try:
             if initial_stamp != (ctime := get_mtime()):
                 file = str(get_selfpath())
-                when = datetime.utcfromtimestamp(ctime)
+                when = datetime.fromtimestamp(ctime, tz=UTC)
                 logger.warning(
                     f"{file=} updated at {when} "
                     f"({time.time() - ctime:.2f}s ago), stop",
@@ -357,7 +360,8 @@ def quit_at(
 
         Args:
             wait:
-                Maximum time to block (seconds). Pass ``0`` to return immediately.
+                Maximum time to block (seconds). Pass ``0`` to return
+                immediately.
             poll:
                 Interval between checks (seconds). Defaults to ``2.5`` or the
                 value passed in ``kw["poll"]``.
@@ -376,7 +380,5 @@ def quit_at(
             time.sleep(poll)
         return solution
 
-    # Attach the sleep method to the returned callable so users can write:
-    #   while checker.sleep(60): ...
-    on_change.sleep = sleep  # type: ignore[attr-defined]
-    return on_change  # type: ignore[return-value]
+    on_change.sleep = sleep  # type: ignore[attr-defined]  # pyright: ignore[reportFunctionMemberAccess]
+    return on_change  # type: ignore[return-value]  # pyright: ignore[reportReturnType]

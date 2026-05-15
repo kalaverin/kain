@@ -88,9 +88,11 @@ class TestMonkeyPatch:
                 return original
             return mod
 
-        with patch("kain.monkey.Is.module", return_value=True):
-            with patch("kain.monkey.required", side_effect=fake_required):
-                result = Monkey.patch(mod, replacement)
+        with (
+            patch("kain.monkey.Is.module", return_value=True),
+            patch("kain.monkey.required", side_effect=fake_required),
+        ):
+            result = Monkey.patch(mod, replacement)
 
         assert result is replacement
         assert mod.original_attr is replacement
@@ -135,9 +137,11 @@ class TestMonkeyPatch:
         def fake_required(path: object, *args: object) -> object:
             return node
 
-        with patch("kain.monkey.required", side_effect=fake_required):
-            with pytest.raises(RuntimeError):
-                Monkey.patch((node, "func"), node)
+        with (
+            patch("kain.monkey.required", side_effect=fake_required),
+            pytest.raises(RuntimeError),
+        ):
+            Monkey.patch((node, "func"), node)
 
     def test_patch_logs_debug(self, caplog: pytest.LogCaptureFixture) -> None:
         """Should log a debug message on successful patch."""
@@ -162,7 +166,7 @@ class TestMonkeyBind:
         def helper() -> int:
             return 42
 
-        assert node.helper() == 42  # type: ignore[attr-defined]
+        assert node.helper() == 42  # type: ignore[assignment][attr-defined]
 
     def test_bind_with_custom_name(self) -> None:
         """Should use the provided name when binding."""
@@ -172,10 +176,11 @@ class TestMonkeyBind:
         def helper() -> int:
             return 42
 
-        assert node.custom() == 42  # type: ignore[attr-defined]
+        assert node.custom() == 42  # type: ignore[assignment][attr-defined]
 
     def test_bind_with_classmethod_decorator(self) -> None:
-        """Should pass the node as the first arg when decorator is classmethod."""
+        """Should pass the node as the first arg when decorator is
+        classmethod."""
         node = types.SimpleNamespace()
         received: list[object] = []
 
@@ -184,7 +189,7 @@ class TestMonkeyBind:
             received.append(target)
             return target
 
-        result = node.helper()  # type: ignore[attr-defined]
+        result = node.helper()  # type: ignore[assignment][attr-defined]
         assert result is node
         assert received == [node]
 
@@ -205,11 +210,11 @@ class TestMonkeyWrap:
         @Monkey.wrap(node, "mul")
         def wrapper(wrapped: object, x: int) -> int:
             calls.append(("before", x))
-            result = wrapped(x)  # type: ignore[operator]
+            result = wrapped(x)  # type: ignore[assignment][operator]
             calls.append(("after", result))
             return result
 
-        assert node.mul(5) == 10  # type: ignore[operator]
+        assert node.mul(5) == 10  # type: ignore[assignment][operator]
         assert calls == [("before", 5), ("after", 10)]
 
         # Restore
@@ -235,9 +240,9 @@ class TestMonkeyWrap:
 
         @Monkey.wrap(node, "func", decorator=my_decorator)
         def wrapper(wrapped: object) -> str:
-            return "wrapped:" + wrapped()  # type: ignore[operator]
+            return "wrapped:" + wrapped()  # type: ignore[assignment][operator]
 
-        assert node.func() == "wrapped:original"  # type: ignore[operator]
+        assert node.func() == "wrapped:original"  # type: ignore[assignment][operator]
         assert "decorated" in calls
 
         # Restore
@@ -258,7 +263,7 @@ class TestMonkeyWrap:
 
         @Monkey.wrap(Node, "method")
         def wrapper(wrapped: object, self: object) -> str:
-            return "wrapped:" + wrapped(self)  # type: ignore[operator]
+            return "wrapped:" + wrapped(self)  # type: ignore[assignment][operator]
 
         obj = Node()
         assert obj.method() == "wrapped:original"
@@ -268,7 +273,7 @@ class TestMonkeyWrap:
         if patched in Monkey.mapping:
             Node.method = Monkey.mapping.pop(patched)
         else:
-            Node.method = original_method  # type: ignore[assignment]
+            Node.method = original_method  # type: ignore[assignment][assignment]
 
     def test_wrap_logs_info(self, caplog: pytest.LogCaptureFixture) -> None:
         """Should log an info message when wrapping."""
@@ -414,7 +419,7 @@ class TestMonkeyWrapExtended:
 
         @Monkey.wrap(node, "fn")
         def wrapper(wrapped: object, x: int, y: int) -> int:
-            return wrapped(x, y) * 2  # type: ignore[operator]
+            return wrapped(x, y) * 2  # type: ignore[assignment][operator]
 
         assert node.fn(1, 2) == 6
 
@@ -428,7 +433,7 @@ class TestMonkeyWrapExtended:
 
         @Monkey.wrap(Node, "static")
         def wrapper(wrapped: object) -> str:
-            return "wrap:" + wrapped()  # type: ignore[operator]
+            return "wrap:" + wrapped()  # type: ignore[assignment][operator]
 
         assert Node.static() == "wrap:static"
 
@@ -436,4 +441,4 @@ class TestMonkeyWrapExtended:
         if patched in Monkey.mapping:
             Node.static = Monkey.mapping.pop(patched)
         else:
-            Node.static = original  # type: ignore[assignment]
+            Node.static = original  # type: ignore[assignment][assignment]

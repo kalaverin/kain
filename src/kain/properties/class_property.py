@@ -3,37 +3,41 @@
 The descriptors here extend :class:`BaseProperty` so that the wrapped function
 receives the *class* itself (for ``class_property``) or either the instance or
 the class (for ``mixed_property``) as its first positional argument.
-
-Both descriptors transparently support async functions: if ``self.function``
-is a coroutine function, the result is wrapped with
-:func:`asyncio.ensure_future` so the caller receives an awaitable.
 """
+
+# ruff: noqa: ANN401, N801
 
 from __future__ import annotations
 
-from asyncio import ensure_future
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from functools import cached_property
-from inspect import iscoroutinefunction
-from typing import Any, Generic, TypeVar, overload, override
+from types import NoneType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    TypeVar,
+    cast,
+    overload,
+    override,
+)
 
-from kain.internals import Is, Who, get_owner
+from kain import Is, Who
+from kain.internals import get_owner
 from kain.properties.primitives import (
-    AttributeException,
+    AttributeExceptionError,
     BaseProperty,
     ContextFaultError,
+    parent_call,
 )
 
-__all__ = (
-    "class_property",
-    "mixed_property",
-)
+__all__ = ("class_property", "mixed_property")
 
-T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 R = TypeVar("R")
 
 
-class class_property(BaseProperty, Generic[T, R]):
+class class_property[T_co](BaseProperty[T_co]):
     """Descriptor that calls ``function(klass)``.
 
     When the attribute is accessed as ``MyClass.attr`` *or*
@@ -49,69 +53,65 @@ class class_property(BaseProperty, Generic[T, R]):
 
     # ``klass`` is used by error-formatting utilities to indicate that this
     # descriptor expects a class-like ``node``.
-    klass: bool | None = True
+    klass: ClassVar[bool | NoneType] = True
 
-    @overload
-    def __new__(
-        cls,
-        function: Callable[[type[T]], R],
-    ) -> class_property[T, R]: ...
-    @overload
-    def __new__(cls, function: Callable[..., R]) -> class_property[Any, R]: ...
-    def __new__(cls, function: Callable[..., R]) -> class_property[Any, R]:
-        """Create a new class-property instance."""
-        return object.__new__(cls)
+    def __init__(self, function: Callable[[Any], T_co]) -> None:
+        super().__init__(function)
 
     @cached_property
+    @override
     def title(self) -> str:
-        """Return a display title for this property."""
         return f"class descriptor {Who.Addr(self)}".strip()
 
     @override
-    def header_with_context(self, node: object) -> str:
-        """Return a header string with owner context."""
+    def header_with_context(self, node: Any) -> str:
         return self.footer(node)
 
-    def get_node(self, node: object) -> type[T]:
-        """Validate that ``node`` is a class and return its owner.
-
-        :func:`get_owner` walks the MRO to find the class that actually
-        defines this descriptor.  This matters when the property is used in
-        a mixin or abstract base class and inherited by concrete subclasses.
-        """
+    def get_node(self, node: Any) -> Any:
         if node is None or not Is.Class(node):
-            msg = f"{self.header_with_context(node)}, {node=}"
+            msg = f"{self.header_with_context(node)}, node={node!r}"
             raise ContextFaultError(msg)
-
         result = get_owner(node, self.name)
-        return result if result is not None else node  # type: ignore[return-value]
+        return result if result is not None else node
 
-    def call(self, node: object) -> R | Awaitable[R]:
-        """Invoke ``self.function(node)``, wrapping coroutines if needed."""
+    @override
+    def call(self, node: Any, *args: Any, **kw: Any) -> T_co:
         self.get_node(node)
         try:
-            value = self.function(node)
-            if iscoroutinefunction(self.function):
-                return ensure_future(value)
-            return value
-
+            return self.function(node)
         except AttributeError as e:
-            raise AttributeException(e) from e
+            raise AttributeExceptionError(e) from e
 
     @overload
-    def __get__(self, instance: None, klass: type[T] | None = ...) -> R: ...
+    def __get__(
+        self,
+        instance: None,
+        klass: type[Any] | None = ...,
+    ) -> T_co: ...
     @overload
-    def __get__(self, instance: object, klass: type[T] | None = ...) -> R: ...
+    def __get__(
+        self,
+        instance: object,
+        klass: type[Any] | None = ...,
+    ) -> T_co: ...
+
     def __get__(
         self,
         instance: object | None,
-        klass: type[T] | None = None,
-    ) -> R:
-        """Descriptor protocol hook — always delegates to ``call(klass)``."""
-        return self.call(klass)  # type: ignore[return-value]
+        klass: type[Any] | None = None,
+    ) -> T_co:
+        return self.call(klass)
+
+    if TYPE_CHECKING:
+
+        @staticmethod
+        @override
+        def with_parent(  # pyright: ignore[reportIncompatibleMethodOverride]
+            function: Callable[..., R],
+        ) -> class_property[R]: ...
 
 
-class mixed_property(BaseProperty, Generic[T, R]):
+class mixed_property[T_co](BaseProperty[T_co]):
     """Descriptor that calls ``function(instance_or_klass)``.
 
     A *mixed* property works on both instances and classes:
@@ -124,53 +124,78 @@ class mixed_property(BaseProperty, Generic[T, R]):
     used to resolve the defining class when ``node`` is a class.
     """
 
-    klass: bool | None = None
+    klass: ClassVar[bool | NoneType] = None
 
-    @overload
-    def __new__(cls, function: Callable[[T], R]) -> mixed_property[T, R]: ...
-    @overload
-    def __new__(cls, function: Callable[..., R]) -> mixed_property[Any, R]: ...
-    def __new__(cls, function: Callable[..., R]) -> mixed_property[Any, R]:
-        """Create a new mixed-property instance."""
-        return object.__new__(cls)
+    def __init__(self, function: Callable[[Any], T_co]) -> None:
+        super().__init__(function)
 
     @cached_property
+    @override
     def title(self) -> str:
-        """Return a display title for this property."""
         return f"mixed descriptor {Who.Addr(self)}".strip()
 
     @override
-    def header_with_context(self, node: object) -> str:
-        """Return a header string with owner context."""
+    def header_with_context(self, node: Any) -> str:
         return self.footer(node, "mixed")
 
-    def get_node(self, node: object) -> object:
-        """Validate ``node`` is not ``None`` and resolve the owner if needed."""
+    def get_node(self, node: Any) -> Any:
         if node is None:
-            msg = f"{self.header_with_context(node)}, {node=}"
+            msg = f"{self.header_with_context(node)}, node={node!r}"
             raise ContextFaultError(msg)
         return get_owner(node, self.name) if Is.Class(node) else node
 
-    def call(self, node: object) -> R | Awaitable[R]:
-        """Invoke ``self.function(node)``, wrapping coroutines if needed."""
+    @override
+    def call(self, node: Any, *args: Any, **kw: Any) -> T_co:
         self.get_node(node)
         try:
-            value = self.function(node)
-            if iscoroutinefunction(self.function):
-                return ensure_future(value)
-            return value
-
+            return self.function(node)
         except AttributeError as e:
-            raise AttributeException(e) from e
+            raise AttributeExceptionError(e) from e
 
     @overload
-    def __get__(self, instance: None, klass: type[T] | None = ...) -> R: ...
+    def __get__(
+        self,
+        instance: None,
+        klass: type[Any] | None = ...,
+    ) -> T_co: ...
     @overload
-    def __get__(self, instance: T, klass: type[T] | None = ...) -> R: ...
+    def __get__(
+        self,
+        instance: object,
+        klass: type[Any] | None = ...,
+    ) -> T_co: ...
+
     def __get__(
         self,
         instance: object | None,
-        klass: type[T] | None = None,
-    ) -> R:
-        """Descriptor protocol hook — delegates to ``call(instance or klass)``."""
-        return self.call(instance or klass)  # type: ignore[return-value]
+        klass: type[Any] | None = None,
+    ) -> T_co:
+        return self.call(instance or klass)
+
+    if TYPE_CHECKING:
+
+        @staticmethod
+        @override
+        def with_parent(  # pyright: ignore[reportIncompatibleMethodOverride]
+            function: Callable[..., R],
+        ) -> mixed_property[R]: ...
+
+
+def _class_property_with_parent[R](
+    function: Callable[..., R],
+) -> class_property[R]:
+    return class_property(cast("Callable[[Any], R]", parent_call(function)))
+
+
+def _mixed_property_with_parent[R](
+    function: Callable[..., R],
+) -> mixed_property[R]:
+    return mixed_property(cast("Callable[[Any], R]", parent_call(function)))
+
+
+class_property.with_parent = staticmethod(  # type: ignore[method-assign]
+    _class_property_with_parent,
+)
+mixed_property.with_parent = staticmethod(  # type: ignore[method-assign]
+    _mixed_property_with_parent,
+)

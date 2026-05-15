@@ -1,63 +1,33 @@
-"""Sentinel values and the Singleton metaclass.
+from threading import RLock
+from typing import Any, override
 
-This module provides:
-    - ``Missing``: a sentinel class whose instances are never equal to
-      anything (including themselves) and are always falsy.
-    - ``Nothing``: the default global instance of ``Missing``.
-    - ``Singleton``: a metaclass that guarantees only one instance of a
-      class is ever created.
+from kain import Who
 
-Example:
-    >>> from kain.classes import Nothing, Singleton
-    >>> bool(Nothing)
-    False
-    >>> Nothing == Nothing
-    False
-
-    >>> class Database(metaclass=Singleton):
-    ...     def __init__(self, url: str) -> None:
-    ...         self.url = url
-    ...
-    >>> db1 = Database("sqlite://")
-    >>> db2 = Database("postgres://")
-    >>> db1 is db2
-    True
-    >>> db2.url
-    'sqlite://'
-"""
-
-from typing import override
-
-from kain.internals import Who
-
-__all__ = "Missing", "Nothing", "Singleton"
+__all__ = ("Missing", "Nothing", "Singleton")
 
 
 class Missing:
     """Sentinel object that is always falsy and never equal to anything."""
 
+    __slots__: tuple[Any, ...] = ()
+
     @override
     def __hash__(self) -> int:
-        """Return a hash based on object identity."""
         return id(self)
 
     def __bool__(self) -> bool:
-        """Always return False."""
         return False
 
     @override
     def __eq__(self, _: object) -> bool:
-        """Never equal to anything, including itself."""
         return False
 
     @override
     def __repr__(self) -> str:
-        """Return a descriptive representation with identity."""
         return f"<{Who.Name(self, addr=True)}>"
 
 
-Nothing = Missing()
-"""Global singleton sentinel used to represent an absent value."""
+Nothing: Missing = Missing()
 
 
 class Singleton(type):
@@ -67,6 +37,8 @@ class Singleton(type):
     instance. All subsequent calls return the cached instance,
     ignoring any new arguments.
     """
+
+    _lock: RLock = RLock()
 
     def __init__(
         cls,
@@ -81,6 +53,9 @@ class Singleton(type):
     @override
     def __call__(cls, *args: object, **kw: object) -> object:
         """Return the cached instance, creating it if necessary."""
+
         if cls.instance is Nothing:
-            cls.instance = super().__call__(*args, **kw)
+            with cls._lock:
+                if cls.instance is Nothing:
+                    cls.instance = super().__call__(*args, **kw)
         return cls.instance

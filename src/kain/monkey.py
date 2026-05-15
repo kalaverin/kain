@@ -28,8 +28,8 @@ from logging import getLogger
 from types import ModuleType
 from typing import Any, ClassVar, cast
 
+from kain import Is, Who
 from kain.importer import required
-from kain.internals import Is, Who
 
 logger = getLogger(__name__)
 
@@ -67,7 +67,7 @@ class Monkey:
             >>> Kls.parse("not-a-number")  # no exception raised
         """
 
-        def make_wrapper(func: Callable[..., object]) -> Any:
+        def make_wrapper(func: Callable[..., object]) -> object | None:
             @wraps(func)
             def wrapper(
                 klass: type[object],

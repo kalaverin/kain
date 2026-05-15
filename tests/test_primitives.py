@@ -7,14 +7,13 @@ from functools import cached_property as stdlib_cached_property
 import pytest
 
 from kain.properties.primitives import (
-    AttributeException,
+    AttributeExceptionError,
     BaseProperty,
     ContextFaultError,
     Nothing,
     PropertyError,
     ReadOnlyError,
     bound_property,
-    cache,
     extract_wrapped,
     invocation_context_check,
     parent_call,
@@ -36,29 +35,29 @@ class TestExceptions:
         assert issubclass(ReadOnlyError, Exception)
 
     def test_attribute_exception_inheritance(self) -> None:
-        assert issubclass(AttributeException, PropertyError)
-        assert issubclass(AttributeException, Exception)
+        assert issubclass(AttributeExceptionError, PropertyError)
+        assert issubclass(AttributeExceptionError, Exception)
 
     def test_attribute_exception_stores_origin(self) -> None:
         origin = AttributeError("foo")
-        exc = AttributeException(origin)
+        exc = AttributeExceptionError(origin)
         assert exc.exception is origin
 
     def test_attribute_exception_message_from_colon(self) -> None:
         origin = AttributeError("module: something went wrong")
-        exc = AttributeException(origin)
+        exc = AttributeExceptionError(origin)
         assert exc.message == " something went wrong"
 
     def test_attribute_exception_message_without_colon(self) -> None:
         origin = AttributeError("no colon here")
-        exc = AttributeException(origin)
+        exc = AttributeExceptionError(origin)
         assert exc.message == "no colon here"
 
     def test_attribute_exception_message_accesses_cached_property(
         self,
     ) -> None:
         origin = AttributeError("test")
-        exc = AttributeException(origin)
+        exc = AttributeExceptionError(origin)
         # message is a cached_property; first access computes it
         assert exc.message == "test"
         # second access returns cached value
@@ -66,7 +65,7 @@ class TestExceptions:
 
     def test_attribute_exception_str_is_message(self) -> None:
         origin = AttributeError("split: here")
-        exc = AttributeException(origin)
+        exc = AttributeExceptionError(origin)
         assert str(exc) == " here"
 
 
@@ -84,105 +83,6 @@ class TestNothing:
     def test_nothing_never_equals_itself(self) -> None:
         assert Nothing is Nothing  # identity yes
         assert (Nothing == Nothing) is False  # equality no
-
-
-class TestCache:
-    """Granular tests for the cache() wrapper."""
-
-    def test_decorator_no_args(self) -> None:
-        counter = 0
-
-        @cache
-        def compute(x: int) -> int:
-            nonlocal counter
-            counter += 1
-            return x * 2
-
-        assert compute(3) == 6
-        assert compute(3) == 6
-        assert counter == 1
-
-    def test_decorator_with_int_limit(self) -> None:
-        counter = 0
-
-        @cache(2)
-        def compute(x: int) -> int:
-            nonlocal counter
-            counter += 1
-            return x * 2
-
-        assert compute(1) == 2
-        assert compute(2) == 4
-        assert compute(1) == 2  # cached
-        assert counter == 2
-        assert compute(3) == 6
-        assert counter == 3
-
-    def test_decorator_with_float_limit(self) -> None:
-        counter = 0
-
-        @cache(2.0)
-        def compute(x: int) -> int:
-            nonlocal counter
-            counter += 1
-            return x * 2
-
-        assert compute(1) == 2
-        assert compute(1) == 2
-        assert counter == 1
-
-    def test_decorator_with_none(self) -> None:
-        counter = 0
-
-        @cache(None)
-        def compute(x: int) -> int:
-            nonlocal counter
-            counter += 1
-            return x * 2
-
-        for i in range(50):
-            compute(i)
-        assert counter == 50
-        for i in range(50):
-            compute(i)
-        assert counter == 50
-
-    def test_direct_function_application(self) -> None:
-        counter = 0
-
-        def compute() -> int:
-            nonlocal counter
-            counter += 1
-            return 42
-
-        wrapped = cache(compute)
-        assert wrapped() == 42
-        assert wrapped() == 42
-        assert counter == 1
-
-    def test_rejects_classmethod(self) -> None:
-        with pytest.raises(TypeError, match="can't wrap"):
-            cache(classmethod(lambda cls: 42))
-
-    def test_rejects_staticmethod(self) -> None:
-        with pytest.raises(TypeError, match="can't wrap"):
-            cache(staticmethod(lambda: 42))
-
-    def test_rejects_zero_limit(self) -> None:
-        with pytest.raises(TypeError, match="limit must be None"):
-            cache(0)
-
-    def test_rejects_negative_limit(self) -> None:
-        with pytest.raises(TypeError, match="limit must be None"):
-            cache(-1)
-
-    def test_rejects_string_limit(self) -> None:
-        with pytest.raises(TypeError, match="limit must be None"):
-            cache("invalid")
-
-    def test_rejects_list_limit(self) -> None:
-        with pytest.raises(TypeError, match="limit must be None"):
-            cache([1, 2, 3])
 
 
 class TestExtractWrapped:
@@ -690,9 +590,9 @@ class TestBoundProperty:
 
 
 class TestInvocationContextCheck:
-    """Granular tests for the invoсation_context_check decorator."""
+    """Granular tests for the invocation_context_check decorator."""
 
-    def _make_descriptor(self, klass: bool | None):
+    def _make_descriptor(self, klass: bool | None) -> object:
         class Descriptor:
             def __init__(self) -> None:
                 self.klass = klass

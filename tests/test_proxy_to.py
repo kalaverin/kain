@@ -89,7 +89,7 @@ class TestProxyToBindModes:
         class Descriptor:
             pass
 
-        Descriptor.dynamic = lambda _self: "dynamic"  # type: ignore[attr-defined]
+        Descriptor.dynamic = lambda _self: "dynamic"  # type: ignore[assignment][attr-defined]
 
         @proxy_to("desc", "dynamic", None)
         class Wrapper:
@@ -286,7 +286,7 @@ class TestProxyToValidation:
 
     def test_non_class_raises_type_error(self) -> None:
         with pytest.raises(TypeError, match="isn't a class"):
-            proxy_to("inner", "foo")(lambda x: x)  # type: ignore[arg-type]
+            proxy_to("inner", "foo")(lambda x: x)  # type: ignore[assignment][arg-type]
 
     def test_empty_mapping_list_raises(self) -> None:
         with pytest.raises(ValueError, match="empty"):

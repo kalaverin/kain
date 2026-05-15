@@ -1,6 +1,6 @@
 """Introspection toolbox and type-checking predicates."""
 
-# ruff: noqa: ANN401, FBT001, FBT002
+# ruff: noqa: ANN401
 
 import sys
 from collections import deque
@@ -13,12 +13,10 @@ from collections.abc import (
     Sequence,
 )
 from contextlib import suppress
-from dataclasses import dataclass
 from functools import cache, partial
 from inspect import (
     getmodule,
     getsourcefile,
-    isawaitable,
     isbuiltin,
     isclass,
     iscoroutine,
@@ -35,7 +33,7 @@ from re import sub
 from sys import modules, stderr, stdin, stdout
 from sysconfig import get_paths
 from types import FunctionType, GenericAlias, LambdaType, ModuleType, UnionType
-from typing import Any, TypeVar, cast, get_args, get_origin, overload
+from typing import Any, cast, get_args, get_origin
 
 Collections: tuple[type, ...] = deque, dict, list, set, tuple, bytearray
 """Built-in mutable and immutable collection types."""
@@ -50,8 +48,6 @@ WinNT: bool = "windows" in architecture()[1].lower()
 """True when running on a Windows NT platform."""
 
 __all__ = (
-    "Is",
-    "Who",
     "get_attr",
     "get_owner",
     "iter_inheritance",
@@ -71,15 +67,6 @@ def class_of(obj: Any) -> type[Any]:
         The class of *obj*.
     """
     return obj if isclass(obj) else type(obj)
-
-
-def is_callable(obj: Any) -> bool:
-    """Return whether *obj* is callable.
-
-    Returns:
-        True if *obj* is callable.
-    """
-    return isinstance(obj, Callable) or callable(obj)  # type: ignore[arg-type]
 
 
 def is_collection(obj: Any) -> bool:
@@ -339,14 +326,7 @@ def object_name(obj: Any, full: bool = True) -> str:
 
         for itis in iscoroutine, isfunction, ismethod:
             if itis(obj):
-                name = get_object_name(obj)
-                with suppress(AttributeError):
-                    self_or_cls = (
-                        obj.im_self  # type: ignore[attr-defined]
-                        or obj.im_class  # type: ignore[attr-defined]
-                    )
-                    name = f"{object_name(self_or_cls)}.{post(name)}"
-                return name
+                return get_object_name(obj)
 
         cls = class_of(obj)
         if cls in (property, classmethod, staticmethod):
@@ -428,7 +408,8 @@ def is_imported_module(name: str) -> bool:
 
 
 def get_mro(obj: Any, /, **kw: Any) -> tuple[Any, ...] | str:
-    """Walk the inheritance chain of *obj* with optional transformation and string joining.
+    """Walk the inheritance chain of *obj* with optional
+    transformation and string joining.
 
     Accepts ``func`` to transform each class and ``glue`` to join
     the result into a string.
@@ -536,46 +517,6 @@ def who_is(obj: Any, /, full: bool = True, addr: bool = False) -> str:
     if not addr:
         return name
     return f"{name}#{id(obj):x}"
-
-
-@dataclass
-class Who:
-    """Namespace holding introspection helpers."""
-
-    Args: Callable[..., str] = format_args_and_keywords
-    Cast: Callable[..., str] = just_value
-    File: Callable[..., str | None] = source_file
-    Inheritance: Callable[..., tuple[Any, ...] | str] = get_mro
-    Is: Callable[..., str] = who_is
-    Module: Callable[..., str] = pretty_module
-    Addr: partial[str] = partial(who_is, addr=True)  # noqa: RUF009
-    Name: partial[str] = partial(who_is, full=False)  # noqa: RUF009
-
-
-@dataclass
-class Is:
-    """Namespace holding type-check predicates."""
-
-    Builtin: Callable[..., bool] = is_from_builtin
-    Class: Callable[..., Any] = isclass
-
-    Primitive: Callable[..., bool] = is_from_primitive
-    tty: bool = is_interactive()
-    awaitable: Callable[..., bool] = isawaitable
-    builtin: Callable[..., bool] = isbuiltin
-    callable: Callable[..., bool] = is_callable
-    classOf: Callable[..., type[Any]] = class_of  # noqa: N815
-    collection: Callable[..., bool] = is_collection
-    coroutine: Callable[..., bool] = iscoroutine
-    function: Callable[..., bool] = isfunction
-    imported: Callable[..., bool] = is_imported_module
-    internal: Callable[..., bool] = is_internal
-    iterable: Callable[..., bool] = is_iterable
-    mapping: Callable[..., bool] = is_mapping
-    method: Callable[..., bool] = ismethod
-    module: Callable[..., bool] = ismodule
-    primitive: Callable[..., bool] = is_primitive
-    subclass: Callable[..., bool] = is_subclass
 
 
 # public functions
@@ -745,56 +686,6 @@ def to_bytes(x: bytes | str, /, charset: str | None = None) -> bytes:
         return x
 
     return x.encode(charset or "ascii")
-
-
-T = TypeVar("T")
-K = TypeVar("K")
-V = TypeVar("V")
-K_cmp = TypeVar("K_cmp")
-
-
-# Mapping without key — compare by keys, return (key, value) pairs
-@overload
-def unique(
-    iterable: Mapping[K, V],
-    /,
-    key: None = None,
-    include: Iterable[K] | None = None,
-    exclude: Iterable[K] | None = None,
-) -> Iterator[tuple[K, V]]: ...
-
-
-# Mapping with key — keys are transformed for comparison
-@overload
-def unique(
-    iterable: Mapping[K, V],
-    /,
-    key: Callable[[K], K_cmp],
-    include: Iterable[K_cmp] | None = None,
-    exclude: Iterable[K_cmp] | None = None,
-) -> Iterator[tuple[K, V]]: ...
-
-
-# Regular Iterable without key
-@overload
-def unique(
-    iterable: Iterable[T],
-    /,
-    key: None = None,
-    include: Iterable[T] | None = None,
-    exclude: Iterable[T] | None = None,
-) -> Iterator[T]: ...
-
-
-# Regular Iterable with key
-@overload
-def unique(
-    iterable: Iterable[T],
-    /,
-    key: Callable[[T], K_cmp],
-    include: Iterable[K_cmp] | None = None,
-    exclude: Iterable[K_cmp] | None = None,
-) -> Iterator[T]: ...
 
 
 def unique(

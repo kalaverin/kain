@@ -16,26 +16,35 @@ development = [
   "better-exceptions>=0.3.3",
   "black>=26.3.1",
   "colorama>=0.4.6",
+  "faker>=40.18.0",
   "grpcio-reflection>=1.71.2",
   "hexora>=0.2.4",
   "mypy>=1.19.1,<1.20.0",
   "pre-commit>=4.5.1",
+  "pyrefly>=1.0.0",
   "pytest-asyncio>=1.3.0",
+  "pytest-check>=2.8.0",
+  "pytest-clarity>=1.0.1",
   "pytest-cov>=7.1.0",
   "pytest-dotenv>=0.5.2",
+  "pytest-icdiff>=0.9",
   "pytest-mock>=3.15.1",
+  "pytest-randomly>=4.1.0",
   "pytest-timeout>=2.4.0",
+  "pytest-xdist>=3.8.0",
   "pytest>=9.0.2",
   "python-lsp-server[all]>=1.14.0",
   "refurb>=2.3.0",
+  "righttyper>=0.1.0",
   "ruff>=0.15.8",
   "structlog>=25.5.0",
+  "time-machine>=3.2.0",
   "ty>=0.0.27",
   "typing-extensions>=4.15.0",
   "typing-inspection>=0.4.2",
   "vulture>=2.16",
   "yamlfix>=1.19.1",
-  "yamllint>=1.38.0",
+  "yamllint>=1.38.0"
 ]
 documentation = [
   "sphinx>=8.1.3",
@@ -81,20 +90,55 @@ target-version = ["py312"]
 exclude_lines = [
   "pragma: no cover",
   "if __name__ == .__main__.:",
-  "^\\s+\\.{3}"
+  "^\\s+\\.{3}",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "pass"
 ]
+fail_under = 90
 show_missing = true
 
 [tool.coverage.run]
 branch = true
+omit = [
+  "*/migrations/*",
+  "*/__init__.py",
+  "*/if TYPE_CHECKING:*",
+  "tests/*"
+]
+source = ["src"]
+
 [tool.pylint.messages_control]
 enable = "all"
+
+[tool.pytest.ini_options]
+addopts = [
+  "-ra",
+  "--strict-config",
+  "--strict-markers",
+  "--tb=short",
+  "--timeout=60"
+]
+faulthandler_timeout = 60
+filterwarnings = [
+  "default"
+]
+markers = [
+  "flaky: Known unstable tests requiring retries",
+  "security: Security-focused tests",
+  "serial: Tests that cannot run in parallel",
+  "slow: Tests taking > 1s",
+  "unit: Tests with no external dependencies, fast (< 1s)"
+]
+minversion = "8.0"
+testpaths = ["tests"]
 
 [tool.refurb]
 ignore = [
   123,
   149,
-  176
+  176,
+  191
 ]
 
 [tool.ruff]
@@ -115,6 +159,11 @@ section-order = [
 local-project = ["kain"]
 
 [tool.ruff.lint.per-file-ignores]
+"*.pyi" = [
+  "ANN",
+  "N",
+  "PYI"
+]
 "contrib/*" = []
 "docs/*" = [
   "INP001",  # File `docs/conf.py` is part of an implicit namespace package. Add an `__init__.py`.
@@ -129,7 +178,7 @@ local-project = ["kain"]
   "ARG001",  # Unused function argument: `node`
   "ARG002",  # Unused method argument: `mock_workflow_info`
   "ARG005",  # Unused lambda argument: `cls`
-  "B018",  #  Found useless expression. Either assign it to a variable or remove it.
+  "B018",  # Found useless expression. Either assign it to a variable or remove it.
   "FBT003",  # Boolean positional value in function call
   "INP001",  # File `tests/workflows/test_turnover_workflows.py` is part of an implicit namespace package. Add an `__init__.py`.
   "N805",  # First argument of a method should be named `self`
@@ -140,7 +189,9 @@ local-project = ["kain"]
   "PYI024",  # Use `typing.NamedTuple` instead of `collections.namedtuple`
   "S101",  # Use of `assert` detected
   "SLF001",  # Private member accessed: `_proxy`
-  "TRY301",  # Abstract `raise` to an inner function
+  "TC002",  # Move third-party import `faker.Faker` into a type-checking block
+  "TC003",  # Move standard library import `collections.abc.Generator` into a type-checking block
+  "TRY301"  # Abstract `raise` to an inner function
 ]
 
 [tool.setuptools]
@@ -151,6 +202,7 @@ packages = ["kain"]
 
 [tool.ty.rules]
 possibly-missing-attribute = "ignore"
+
 [tool.uv]
 default-groups = [
   "development"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import pickle
+from typing import Self
 
 import pytest
 
@@ -190,17 +191,17 @@ class TestMissing:
     def test_pickle_roundtrip(self, protocol: int) -> None:
         m = Missing()
         data = pickle.dumps(m, protocol=protocol)
-        loaded = pickle.loads(data)
+        loaded = pickle.loads(data)  # noqa: S301
         assert isinstance(loaded, Missing)
         assert bool(loaded) is False
 
     def test_pickle_unpickled_is_distinct(self) -> None:
         m = Missing()
-        loaded = pickle.loads(pickle.dumps(m))
+        loaded = pickle.loads(pickle.dumps(m))  # noqa: S301
         assert loaded is not m
 
     def test_pickle_preserves_behavior(self) -> None:
-        loaded = pickle.loads(pickle.dumps(Missing()))
+        loaded = pickle.loads(pickle.dumps(Missing()))  # noqa: S301
         assert loaded != loaded
         assert hash(loaded) == id(loaded)
 
@@ -318,12 +319,12 @@ class TestNothing:
 
     def test_nothing_pickle_roundtrip(self) -> None:
         data = pickle.dumps(Nothing)
-        loaded = pickle.loads(data)
+        loaded = pickle.loads(data)  # noqa: S301
         assert isinstance(loaded, Missing)
         assert bool(loaded) is False
 
     def test_nothing_pickle_preserves_behavior(self) -> None:
-        loaded = pickle.loads(pickle.dumps(Nothing))
+        loaded = pickle.loads(pickle.dumps(Nothing))  # noqa: S301
         assert loaded != loaded
 
     def test_nothing_not_equal_none(self) -> None:
@@ -367,7 +368,8 @@ class TestSingleton:
         assert calls[0] == (1,)
 
     def test_instance_attribute_reset(self) -> None:
-        """Resetting the metaclass instance attribute creates a new singleton."""
+        """Resetting the metaclass instance attribute creates a new
+        singleton."""
 
         class Single(metaclass=Singleton):
             pass
@@ -415,7 +417,7 @@ class TestSingleton:
                 self.val = val
 
         s1 = Single("first")
-        s2 = Single("ignored")
+        Single("ignored")
         assert s1.val == "first"
 
     def test_singleton_ignores_subsequent_kwargs(self) -> None:
@@ -424,7 +426,7 @@ class TestSingleton:
                 self.val = val
 
         s1 = Single(val="first")
-        s2 = Single(val="ignored")
+        Single(val="ignored")
         assert s1.val == "first"
 
     def test_singleton_ignores_subsequent_mixed(self) -> None:
@@ -433,7 +435,7 @@ class TestSingleton:
                 self.val = (a, b)
 
         s1 = Single(1, b=2)
-        s2 = Single(9, b=99)
+        Single(9, b=99)
         assert s1.val == (1, 2)
 
     def test_singleton_isinstance_check(self) -> None:
@@ -566,7 +568,7 @@ class TestSingleton:
 
     def test_singleton_with_new_override(self) -> None:
         class Single(metaclass=Singleton):
-            def __new__(cls) -> Single:
+            def __new__(cls) -> Self:
                 obj = super().__new__(cls)
                 obj.created = True
                 return obj

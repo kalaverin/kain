@@ -40,7 +40,8 @@ class TestClassCachedPropertyHere:
         class Child(Base):
             pass
 
-        # First access on Child: function receives Child, but cache stored on Base
+        # First access on Child: function receives Child,
+        # but cache stored on Base
         assert Child.prop == "Child"
         assert Base.prop == "Child"  # shared cache on Base
         assert Base.counter == 1

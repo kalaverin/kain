@@ -25,12 +25,11 @@ from typing import (
 
 import pytest
 
+from kain import Is, Who
 from kain.internals import (
     Builtins,
     Collections,
-    Is,
     Primitives,
-    Who,
     class_of,
     format_args_and_keywords,
     get_attr,
@@ -38,7 +37,6 @@ from kain.internals import (
     get_module_name,
     get_mro,
     get_owner,
-    is_callable,
     is_collection,
     is_from_builtin,
     is_from_primitive,
@@ -76,18 +74,6 @@ class TestClassOf:
 
     def test_class_of_none(self) -> None:
         assert class_of(None) is type(None)
-
-
-class TestIsCallable:
-    def test_callable_true(self) -> None:
-        assert is_callable(lambda: 1) is True
-        assert is_callable(print) is True
-        assert is_callable(len) is True
-
-    def test_callable_false(self) -> None:
-        assert is_callable(1) is False
-        assert is_callable("hello") is False
-        assert is_callable(None) is False
 
 
 class TestIsCollection:
@@ -706,8 +692,8 @@ class TestIsNamespaceComprehensive:
     """Comprehensive tests for the ``Is`` predicate namespace."""
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             (int, True),
             (str, True),
             (type, True),
@@ -720,32 +706,14 @@ class TestIsNamespaceComprehensive:
             (Protocol, True),
             (Generic, True),
             (int | str, False),
-        ],
+        ),
     )
     def test_is_class(self, obj: Any, expected: bool) -> None:
         assert Is.Class(obj) is expected
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
-            (lambda: 1, True),
-            (print, True),
-            (len, True),
-            (partial(max, 10), True),
-            (object().__str__, True),
-            (1, False),
-            ("hello", False),
-            (None, False),
-            ([1, 2], False),
-            ({1, 2}, False),
-        ],
-    )
-    def test_is_callable(self, obj: Any, expected: bool) -> None:
-        assert Is.callable(obj) is expected
-
-    @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             ([1, 2], True),
             ((1, 2), True),
             ({"a": 1}, True),
@@ -756,14 +724,14 @@ class TestIsNamespaceComprehensive:
             (None, False),
             (42, False),
             (set(), False),
-        ],
+        ),
     )
     def test_is_collection(self, obj: Any, expected: bool) -> None:
         assert Is.collection(obj) is expected
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             ({"a": 1}, True),
             (dict, True),
             (None, False),
@@ -771,14 +739,14 @@ class TestIsNamespaceComprehensive:
             ("abc", False),
             (42, False),
             ((), False),
-        ],
+        ),
     )
     def test_is_mapping(self, obj: Any, expected: bool) -> None:
         assert Is.mapping(obj) is expected
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             (os, True),
             (sys, True),
             (types, True),
@@ -787,14 +755,14 @@ class TestIsNamespaceComprehensive:
             ("hello", False),
             (int, False),
             (None, False),
-        ],
+        ),
     )
     def test_is_module(self, obj: Any, expected: bool) -> None:
         assert Is.module(obj) is expected
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             (True, True),
             (False, True),
             (None, True),
@@ -811,14 +779,14 @@ class TestIsNamespaceComprehensive:
             (bytearray(b"x"), True),
             (object(), False),
             (lambda: 1, False),
-        ],
+        ),
     )
     def test_is_primitive(self, obj: Any, expected: bool) -> None:
         assert Is.primitive(obj) is expected
 
     @pytest.mark.parametrize(
-        ("obj", "types", "expected"),
-        [
+        "obj, types, expected",
+        (
             (1, int, True),
             (1, str, False),
             (None, type(None), True),
@@ -830,14 +798,14 @@ class TestIsNamespaceComprehensive:
             ({}, dict[str, int], True),
             (1, None, False),
             ("x", str | int | bytes, True),
-        ],
+        ),
     )
     def test_is_subclass(self, obj: Any, types: Any, expected: bool) -> None:
         assert Is.subclass(obj, types) is expected
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             (1, True),
             (int, True),
             (print, True),
@@ -847,14 +815,14 @@ class TestIsNamespaceComprehensive:
             (object(), True),
             (type("Custom", (), {}), False),
             (lambda: 1, False),
-        ],
+        ),
     )
     def test_is_internal(self, obj: Any, expected: bool) -> None:
         assert Is.internal(obj) is expected
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             ([1, 2], True),
             ("abc", True),
             ({"a": 1}, True),
@@ -864,7 +832,7 @@ class TestIsNamespaceComprehensive:
             (None, False),
             (object(), False),
             (42.0, False),
-        ],
+        ),
     )
     def test_is_iterable(self, obj: Any, expected: bool) -> None:
         assert Is.iterable(obj) is expected
@@ -932,13 +900,13 @@ class TestWhoNamespaceComprehensive:
     """Comprehensive tests for the ``Who`` introspection namespace."""
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             (1, "int"),
             ("hello", "str"),
             (None, "NoneType"),
             (int, "int"),
-        ],
+        ),
     )
     def test_who_is_basic(self, obj: Any, expected: str) -> None:
         assert Who.Is(obj) == expected
@@ -982,8 +950,8 @@ class TestWhoIsEdgeCases:
     """Edge cases for ``who_is`` and ``object_name``."""
 
     @pytest.mark.parametrize(
-        ("obj", "full", "expected"),
-        [
+        "obj, full, expected",
+        (
             (lambda x: x, False, "<lambda>"),
             (object().__str__, False, "__str__"),
             (weakref.ref(type("X", (), {})()), True, "weakref.ReferenceType"),
@@ -991,7 +959,7 @@ class TestWhoIsEdgeCases:
             (NotImplemented, True, "NotImplementedType"),
             (slice(1, 2), True, "slice"),
             (memoryview(b"abc"), True, "memoryview"),
-        ],
+        ),
     )
     def test_who_is_specials(
         self,
@@ -1048,12 +1016,12 @@ class TestObjectNameEdgeCases:
     """Additional ``object_name`` edge cases."""
 
     @pytest.mark.parametrize(
-        ("obj", "full", "expected"),
-        [
+        "obj, full, expected",
+        (
             (classmethod(lambda x: x), True, "classmethod"),
             (staticmethod(lambda x: x), True, "staticmethod"),
             (property(lambda self: 1), True, "<lambda>"),
-        ],
+        ),
     )
     def test_object_name_descriptors(
         self,
@@ -1108,8 +1076,8 @@ class TestClassOfEdgeCases:
     """Extended ``class_of`` coverage."""
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             (42, int),
             (int, int),
             (None, type(None)),
@@ -1119,7 +1087,7 @@ class TestClassOfEdgeCases:
             (TypeVar("T"), TypeVar),
             (Literal[1], type(Literal[1])),
             (NotImplemented, type(NotImplemented)),
-        ],
+        ),
     )
     def test_class_of(self, obj: Any, expected: type[Any]) -> None:
         assert class_of(obj) is expected
@@ -1279,7 +1247,7 @@ class TestIterInheritanceEdgeCases:
     def test_iter_inheritance_with_abc(self) -> None:
         from collections.abc import Mapping, MutableMapping
 
-        class MyMap(MutableMapping):  # type: ignore[type-arg]
+        class MyMap(MutableMapping):  # type: ignore[assignment][type-arg]
             def __getitem__(self, key: Any) -> Any:
                 return key
 
@@ -1300,7 +1268,7 @@ class TestIterInheritanceEdgeCases:
         assert Mapping in result
 
     def test_iter_inheritance_no_stdlib(self) -> None:
-        class MyException(Exception):
+        class MyException(Exception):  # noqa: N818
             pass
 
         result = list(iter_inheritance(MyException, exclude_stdlib=True))
@@ -1415,7 +1383,7 @@ class TestGetAttrEdgeCases:
 
     def test_get_attr_descriptor(self) -> None:
         class Descriptor:
-            def __get__(self, obj: Any, type: type[Any] | None = None) -> int:
+            def __get__(self, obj: Any, kind: type[Any] | None = None) -> int:
                 return 42
 
         class A:
@@ -1508,15 +1476,15 @@ class TestToAsciiEdgeCases:
     """Extended ``to_ascii`` coverage."""
 
     @pytest.mark.parametrize(
-        ("inp", "charset", "expected"),
-        [
+        "inp, charset, expected",
+        (
             ("hello", None, "hello"),
             (b"hello", None, "hello"),
             ("café", "utf-8", "café"),
             ("café".encode(), "utf-8", "café"),
             ("naïve", "latin-1", "naïve"),
             ("naïve".encode("latin-1"), "latin-1", "naïve"),
-        ],
+        ),
     )
     def test_to_ascii(
         self,
@@ -1531,14 +1499,14 @@ class TestToAsciiEdgeCases:
 
     @pytest.mark.parametrize(
         "inp",
-        [
+        (
             123,
             3.14,
             None,
             [1, 2],
             {"a": 1},
             object(),
-        ],
+        ),
     )
     def test_to_ascii_invalid(self, inp: Any) -> None:
         with pytest.raises(TypeError):
@@ -1549,13 +1517,13 @@ class TestToBytesEdgeCases:
     """Extended ``to_bytes`` coverage."""
 
     @pytest.mark.parametrize(
-        ("inp", "charset", "expected"),
-        [
+        "inp, charset, expected",
+        (
             ("hello", None, b"hello"),
             (b"hello", None, b"hello"),
             ("café", "utf-8", "café".encode()),
             ("naïve", "latin-1", "naïve".encode("latin-1")),
-        ],
+        ),
     )
     def test_to_bytes(
         self,
@@ -1570,14 +1538,14 @@ class TestToBytesEdgeCases:
 
     @pytest.mark.parametrize(
         "inp",
-        [
+        (
             123,
             3.14,
             None,
             [1, 2],
             {"a": 1},
             object(),
-        ],
+        ),
     )
     def test_to_bytes_invalid(self, inp: Any) -> None:
         with pytest.raises(TypeError):
@@ -1648,15 +1616,15 @@ class TestSimpleReprEdgeCases:
     """Extended ``simple_repr`` coverage."""
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             (None, None),
             (True, True),
             (False, False),
             ("hello", "hello"),
             (42, "42"),
             (3.14, "3.14"),
-        ],
+        ),
     )
     def test_simple_repr(self, obj: Any, expected: Any) -> None:
         assert simple_repr(obj) == expected
@@ -1739,7 +1707,7 @@ class TestGetModuleEdgeCases:
             pass
 
         instance = NoModule()
-        instance.__module__ = None  # type: ignore[attr-defined]
+        instance.__module__ = None  # type: ignore[assignment][attr-defined]
         mod = get_module(instance)
         assert mod is None or mod.__name__ is not None
 
@@ -1748,8 +1716,8 @@ class TestIsSubclassEdgeCases:
     """Extended ``is_subclass`` coverage."""
 
     @pytest.mark.parametrize(
-        ("obj", "types", "expected"),
-        [
+        "obj, types, expected",
+        (
             (1, int, True),
             (1, str, False),
             (None, type(None), True),
@@ -1761,7 +1729,7 @@ class TestIsSubclassEdgeCases:
             (1, None, False),
             (None, object, True),
             ("x", str | int | bytes, True),
-        ],
+        ),
     )
     def test_subclass_basic(
         self,
@@ -1772,12 +1740,12 @@ class TestIsSubclassEdgeCases:
         assert is_subclass(obj, types) is expected
 
     def test_subclass_with_typing_union(self) -> None:
-        assert is_subclass(1, Union[int, str]) is True
-        assert is_subclass(1, Union[str, bytes]) is False
+        assert is_subclass(1, Union[int, str]) is True  # noqa: UP007
+        assert is_subclass(1, Union[str, bytes]) is False  # noqa: UP007
 
     def test_subclass_optional(self) -> None:
-        assert is_subclass(1, Optional[int]) is True
-        assert is_subclass(None, Optional[int]) is True
+        assert is_subclass(1, Optional[int]) is True  # noqa: UP045
+        assert is_subclass(None, Optional[int]) is True  # noqa: UP045
 
     def test_subclass_generic_alias(self) -> None:
         assert is_subclass([1, 2], list[int]) is True
@@ -1793,24 +1761,24 @@ class TestIsImportedModuleEdgeCases:
 
     @pytest.mark.parametrize(
         "name",
-        [
+        (
             "os",
             "os.path",
             "sys",
             "collections.abc",
             "typing",
             "json",
-        ],
+        ),
     )
     def test_imported_true(self, name: str) -> None:
         assert is_imported_module(name) is True
 
     @pytest.mark.parametrize(
         "name",
-        [
+        (
             "definitely_not_imported_module_12345",
             "os.definitely_not_imported_submodule_12345",
-        ],
+        ),
     )
     def test_imported_false(self, name: str) -> None:
         assert is_imported_module(name) is False

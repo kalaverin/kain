@@ -62,10 +62,10 @@ upgrade:
 # publish package to repository
 [group('packaging')]
 publish:
-	@rm -rf dist/ || true
-	@uv build
-	@uv run uv-publish --repo kain
-	@rm -rf dist/ || true
+    @rm -rf dist/ || true
+    @uv build
+    @uv run uv-publish --repo kain
+    @rm -rf dist/ || true
 
 # build docker image
 [group('packaging')]

@@ -8,7 +8,7 @@ import threading
 import warnings
 from functools import partial
 from types import TracebackType
-from typing import Any
+from typing import Any, Never
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
@@ -32,7 +32,7 @@ def _isolate_on_quit() -> None:
     original_threading_hook = threading.excepthook
 
     # Reset singleton state so the next test gets a fresh instance
-    on_quit.instance = Nothing  # type: ignore[attr-defined]
+    on_quit.instance = Nothing  # type: ignore[assignment][attr-defined]
 
     yield
 
@@ -41,14 +41,14 @@ def _isolate_on_quit() -> None:
     if inst is not Nothing and hasattr(inst, "restore_original_handlers"):
         inst.restore_original_handlers()
 
-    on_quit.instance = Nothing  # type: ignore[attr-defined]
+    on_quit.instance = Nothing  # type: ignore[assignment][attr-defined]
     sys.excepthook = original_excepthook
     threading.excepthook = original_threading_hook
 
 
 def _fresh_instance() -> Any:
     """Create a fresh on_quit singleton instance."""
-    on_quit.instance = Nothing  # type: ignore[attr-defined]
+    on_quit.instance = Nothing  # type: ignore[assignment][attr-defined]
     return on_quit()
 
 
@@ -199,19 +199,19 @@ class TestQuitAt:
         assert mtime > 0.0
 
     def test_quit_at_returns_callable_with_sleep_attr(self) -> None:
-        quit_at.cache_clear()  # type: ignore[attr-defined]
+        quit_at.cache_clear()  # type: ignore[assignment][attr-defined]
         checker = quit_at()
         assert callable(checker)
         assert hasattr(checker, "sleep")
         assert callable(checker.sleep)
 
     def test_quit_at_on_change_true_when_no_changes(self) -> None:
-        quit_at.cache_clear()  # type: ignore[attr-defined]
+        quit_at.cache_clear()  # type: ignore[assignment][attr-defined]
         checker = quit_at()
         assert checker() is True
 
     def test_quit_at_sleep_method_with_zero_wait(self) -> None:
-        quit_at.cache_clear()  # type: ignore[attr-defined]
+        quit_at.cache_clear()  # type: ignore[assignment][attr-defined]
         checker = quit_at()
         assert checker.sleep(0.0) is True
         assert checker.sleep(0.0, poll=0.1) is True
@@ -220,9 +220,9 @@ class TestQuitAt:
         import kain.signals as sig_mod
 
         mock_exit = MagicMock()
-        quit_at.cache_clear()  # type: ignore[attr-defined]
+        quit_at.cache_clear()  # type: ignore[assignment][attr-defined]
         with patch("kain.signals.bind") as mock_bind:
-            checker = quit_at(func=mock_exit, signal=signal.SIGUSR1)
+            quit_at(func=mock_exit, signal=signal.SIGUSR1)
             mock_bind.assert_called_once_with(signal.SIGUSR1, ANY)
         handler = mock_bind.call_args[0][1]
         assert sig_mod.NeedRestart is False
@@ -234,7 +234,7 @@ class TestQuitAt:
         import kain.signals as sig_mod
 
         mock_exit = MagicMock()
-        quit_at.cache_clear()  # type: ignore[attr-defined]
+        quit_at.cache_clear()  # type: ignore[assignment][attr-defined]
         checker = quit_at(func=mock_exit, signal=signal.SIGUSR1)
         sig_mod.NeedRestart = True
         try:
@@ -245,7 +245,7 @@ class TestQuitAt:
 
     def test_quit_at_on_change_file_not_found(self) -> None:
         mock_exit = MagicMock()
-        quit_at.cache_clear()  # type: ignore[attr-defined]
+        quit_at.cache_clear()  # type: ignore[assignment][attr-defined]
         with patch("kain.signals.get_mtime") as mock_mtime:
             mock_mtime.return_value = 1.0
             checker = quit_at(func=mock_exit)
@@ -254,7 +254,7 @@ class TestQuitAt:
 
     def test_quit_at_sleep_with_short_wait(self) -> None:
         mock_exit = MagicMock()
-        quit_at.cache_clear()  # type: ignore[attr-defined]
+        quit_at.cache_clear()  # type: ignore[assignment][attr-defined]
         checker = quit_at(func=mock_exit)
         result = checker.sleep(0.01, poll=0.001)
         assert result is True
@@ -414,11 +414,11 @@ class TestOnQuitHooksExtended:
         inst = _fresh_instance()
         calls: list[str] = []
 
-        def bad_hook(*_):
+        def bad_hook(*_) -> Never:
             calls.append("bad")
             raise RuntimeError("hook boom")
 
-        def good_hook(*_):
+        def good_hook(*_) -> None:
             calls.append("good")
 
         inst.add_hook(bad_hook)
@@ -435,7 +435,7 @@ class TestOnQuitHooksExtended:
         inst = _fresh_instance()
         count = 0
 
-        def hook(*_):
+        def hook(*_) -> None:
             nonlocal count
             count += 1
 
@@ -461,7 +461,7 @@ class TestOnQuitHooksExtended:
         inst = _fresh_instance()
         call_count = 0
 
-        def mutating_hook(*_):
+        def mutating_hook(*_) -> None:
             nonlocal call_count
             call_count += 1
             sys.excepthook = lambda *_: None
@@ -496,14 +496,14 @@ class TestOnQuitThreadingExtended:
 
     @pytest.mark.parametrize(
         "exc_type,should_proxy",
-        [
+        (
             (SystemExit, False),
             (None, False),
             (ValueError, True),
             (RuntimeError, True),
             (TypeError, True),
             (KeyboardInterrupt, True),
-        ],
+        ),
     )
     def test_threading_handler_various_exceptions(
         self,
@@ -571,7 +571,7 @@ class TestOnQuitSignalExtended:
 
     @pytest.mark.parametrize(
         "sig",
-        [signal.SIGINT, signal.SIGTERM, signal.SIGQUIT],
+        (signal.SIGINT, signal.SIGTERM, signal.SIGQUIT),
     )
     def test_signal_handler_exits_with_code_one(self, sig: int) -> None:
         inst = _fresh_instance()
@@ -583,7 +583,7 @@ class TestOnQuitSignalExtended:
 
     @pytest.mark.parametrize(
         "sig",
-        [signal.SIGINT, signal.SIGTERM, signal.SIGQUIT],
+        (signal.SIGINT, signal.SIGTERM, signal.SIGQUIT),
     )
     def test_inject_signal_handler_binds_signal(self, sig: int) -> None:
         inst = _fresh_instance()
@@ -601,7 +601,7 @@ class TestOnQuitSignalExtended:
 
     @pytest.mark.parametrize(
         "sig",
-        [signal.SIGINT, signal.SIGTERM, signal.SIGQUIT],
+        (signal.SIGINT, signal.SIGTERM, signal.SIGQUIT),
     )
     def test_restore_original_handlers_resets_signal(self, sig: int) -> None:
         inst = _fresh_instance()
@@ -640,7 +640,7 @@ class TestQuitAtExtended:
 
     @pytest.fixture(autouse=True)
     def _clear_quit_at_cache(self) -> None:
-        quit_at.cache_clear()  # type: ignore[attr-defined]
+        quit_at.cache_clear()  # type: ignore[assignment][attr-defined]
 
     def test_on_change_detects_mtime_change(self) -> None:
         mock_exit = MagicMock()
@@ -722,7 +722,7 @@ class TestQuitAtExtended:
     def test_signal_registration_and_handler(self) -> None:
         mock_exit = MagicMock()
         with patch("kain.signals.bind") as mock_bind:
-            checker = quit_at(func=mock_exit, signal=signal.SIGUSR2)
+            quit_at(func=mock_exit, signal=signal.SIGUSR2)
             mock_bind.assert_called_once_with(signal.SIGUSR2, ANY)
 
     def test_signal_unregistration_via_flag_reset(self) -> None:
@@ -771,10 +771,11 @@ class TestQuitAtExtended:
     def test_multiple_quit_at_instances_different_signals(self) -> None:
         mock_exit_a = MagicMock()
         mock_exit_b = MagicMock()
-        with patch("kain.signals.bind") as mock_bind:
+        with patch("kain.signals.bind"):
             checker_a = quit_at(func=mock_exit_a, signal=signal.SIGUSR1)
             checker_b = quit_at(func=mock_exit_b, signal=signal.SIGUSR2)
-            # Because quit_at is cached, if args differ we get different objects
+            # Because quit_at is cached, if args differ we get
+            # different objects
             assert checker_a is not checker_b
 
     def test_on_change_returns_false_on_file_not_found(self) -> None:
@@ -792,29 +793,29 @@ class TestQuitAtParametrized:
 
     @pytest.mark.parametrize(
         "wait,poll",
-        [
+        (
             (0.0, 0.0),
             (0.0, 0.1),
             (0.01, 0.001),
             (0.02, 0.005),
-        ],
+        ),
     )
     def test_sleep_various_short_timeouts(
         self,
         wait: float,
         poll: float,
     ) -> None:
-        quit_at.cache_clear()  # type: ignore[attr-defined]
+        quit_at.cache_clear()  # type: ignore[assignment][attr-defined]
         checker = quit_at()
         result = checker.sleep(wait, poll=poll)
         assert result is True
 
-    @pytest.mark.parametrize("errno_val", [0, 1, 137, 255, 999])
+    @pytest.mark.parametrize("errno_val", (0, 1, 137, 255, 999))
     def test_custom_errno_values(self, errno_val: int) -> None:
         import kain.signals as sig_mod
 
         mock_exit = MagicMock()
-        quit_at.cache_clear()  # type: ignore[attr-defined]
+        quit_at.cache_clear()  # type: ignore[assignment][attr-defined]
         checker = quit_at(
             func=mock_exit,
             signal=signal.SIGUSR1,

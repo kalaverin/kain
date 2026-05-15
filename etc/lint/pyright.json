@@ -1,13 +1,13 @@
 {
   "include": [
-    "../../app/"
+    "../../src/kain/"
   ],
   "exclude": [
     "**/.*",
     "**/__pycache__/"
   ],
   "ignore": [
-    "../../app/settings.py"
+    "../../src/kain/settings.py"
   ],
   "executionEnvironments": [
     {

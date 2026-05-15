@@ -17,8 +17,8 @@ class TestKainAll:
         assert isinstance(kain.__all__, tuple)
 
     def test_all_length(self) -> None:
-        """``__all__`` should contain exactly 18 public names."""
-        assert len(kain.__all__) == 18
+        """``__all__`` should contain exactly 16 public names."""
+        assert len(kain.__all__) == 16
 
     def test_all_has_no_duplicates(self) -> None:
         """No name should appear more than once in ``__all__``."""
@@ -37,11 +37,9 @@ class TestKainAll:
             "optional",
             "quit_at",
             "required",
-            "sort",
             "to_ascii",
             "to_bytes",
             "unique",
-            "cache",
             "class_property",
             "mixed_property",
             "pin",
@@ -49,17 +47,14 @@ class TestKainAll:
         assert set(kain.__all__) == expected
 
     def test_all_names_are_accessible(self) -> None:
-        """Every name listed in ``__all__`` must exist as a module attribute."""
+        """Every name listed in ``__all__`` must exist as a module
+        attribute."""
         for name in kain.__all__:
             assert hasattr(kain, name)
 
 
 class TestKainExportTypes:
     """Tests verifying the type of each public export."""
-
-    def test_is_is_class(self) -> None:
-        """``Is`` is a dataclass-class namespace."""
-        assert inspect.isclass(kain.Is)
 
     def test_missing_is_class(self) -> None:
         """``Missing`` is a sentinel class."""
@@ -73,10 +68,6 @@ class TestKainExportTypes:
         """``Nothing`` is the global singleton instance of ``Missing``."""
         assert isinstance(kain.Nothing, kain.Missing)
         assert kain.Nothing is not kain.Missing()
-
-    def test_who_is_class(self) -> None:
-        """``Who`` is a dataclass-class namespace."""
-        assert inspect.isclass(kain.Who)
 
     def test_add_path_is_function(self) -> None:
         """``add_path`` is a plain function."""
@@ -98,10 +89,6 @@ class TestKainExportTypes:
     def test_required_is_function(self) -> None:
         """``required`` is a plain function."""
         assert isinstance(kain.required, types.FunctionType)
-
-    def test_sort_is_callable(self) -> None:
-        """``sort`` resolves to a callable (either ``natsorted`` or ``sorted``)."""
-        assert callable(kain.sort)
 
     def test_to_ascii_is_function(self) -> None:
         """``to_ascii`` is a plain function."""

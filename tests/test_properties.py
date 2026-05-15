@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import time
 from typing import Any
 
 import pytest
 
 from kain.properties import (
-    AttributeException,
+    AttributeExceptionError,
     BaseProperty,
     ContextFaultError,
     PropertyError,
@@ -18,7 +17,6 @@ from kain.properties import (
     mixed_property,
     pin,
 )
-from kain.properties.primitives import cache
 
 
 class TestPin:
@@ -115,35 +113,6 @@ class TestPinNative:
         assert obj.prop == 100
         del obj.prop
         assert obj.prop == 42
-
-    @pytest.mark.asyncio
-    async def test_async_support(self) -> None:
-        class Foo:
-            @pin.native
-            async def prop(self) -> int:
-                return 42
-
-        obj = Foo()
-        result = obj.prop
-        assert asyncio.isfuture(result)
-        assert await result == 42
-
-    @pytest.mark.asyncio
-    async def test_async_caches_future(self) -> None:
-        class Foo:
-            counter = 0
-
-            @pin.native
-            async def prop(self) -> int:
-                Foo.counter += 1
-                return 42
-
-        obj = Foo()
-        fut1 = obj.prop
-        fut2 = obj.prop
-        assert fut1 is fut2
-        assert await fut1 == 42
-        assert Foo.counter == 1
 
     def test_ttl_expiration(self) -> None:
         class Foo:
@@ -517,92 +486,6 @@ class TestMixedProperty:
         assert Foo.prop == 4
 
 
-class TestCacheFunction:
-    """Tests for cache() function — standalone lru_cache wrapper."""
-
-    def test_basic_caching(self) -> None:
-        counter = 0
-
-        @cache
-        def compute(x: int) -> int:
-            nonlocal counter
-            counter += 1
-            return x * 2
-
-        assert compute(5) == 10
-        assert compute(5) == 10
-        assert counter == 1
-        assert compute(3) == 6
-        assert counter == 2
-
-    def test_with_limit(self) -> None:
-        counter = 0
-
-        @cache(2)
-        def compute(x: int) -> int:
-            nonlocal counter
-            counter += 1
-            return x * 2
-
-        assert compute(1) == 2
-        assert compute(2) == 4
-        assert compute(1) == 2  # cached
-        assert counter == 2
-        assert compute(3) == 6
-        assert counter == 3
-        assert compute(2) == 4
-        assert counter in (3, 4)
-
-    def test_unlimited_cache(self) -> None:
-        counter = 0
-
-        @cache(None)
-        def compute(x: int) -> int:
-            nonlocal counter
-            counter += 1
-            return x * 2
-
-        for i in range(100):
-            compute(i)
-        assert counter == 100
-        for i in range(100):
-            compute(i)
-        assert counter == 100  # all cached
-
-    def test_direct_function_application(self) -> None:
-        counter = 0
-
-        def compute() -> int:
-            nonlocal counter
-            counter += 1
-            return 42
-
-        wrapped = cache(compute)
-        assert wrapped() == 42
-        assert wrapped() == 42
-        assert counter == 1
-
-    def test_rejects_classmethod(self) -> None:
-        with pytest.raises(TypeError, match="can't wrap"):
-            cache(classmethod(lambda cls: 42))
-
-    def test_rejects_staticmethod(self) -> None:
-        with pytest.raises(TypeError, match="can't wrap"):
-            cache(staticmethod(lambda: 42))
-
-    def test_rejects_invalid_limit_type(self) -> None:
-        with pytest.raises(TypeError, match="limit must be None"):
-            cache("invalid")
-
-    def test_rejects_zero_limit(self) -> None:
-        with pytest.raises(TypeError, match="limit must be None"):
-            cache(0)
-
-    def test_rejects_negative_limit(self) -> None:
-        with pytest.raises(TypeError, match="limit must be None"):
-            cache(-1)
-
-
 class TestWithParent:
     """Tests for BaseProperty.with_parent() method."""
 
@@ -752,10 +635,9 @@ class TestWithParent:
 
 
 class TestCustomCallbackBy:
-    """Tests for .by() and .expired_by() custom cache invalidation."""
+    """Tests for .by() and .by() custom cache invalidation."""
 
     def test_pin_native_by_custom_callback(self) -> None:
-        call_count = 0
         should_invalidate = False
 
         def is_actual(
@@ -799,7 +681,7 @@ class TestCustomCallbackBy:
         class Foo:
             counter = 0
 
-            @pin.native.expired_by(is_still_valid)
+            @pin.native.by(is_still_valid)
             def prop(self) -> int:
                 Foo.counter += 1
                 return 42
@@ -827,7 +709,7 @@ class TestCustomCallbackBy:
         class Foo:
             counter = 0
 
-            @pin.cls.expired_by(is_still_valid)
+            @pin.cls.by(is_still_valid)
             def prop(cls) -> int:
                 Foo.counter += 1
                 return 42
@@ -854,7 +736,7 @@ class TestCustomCallbackBy:
         class Foo:
             counter = 0
 
-            @pin.any.expired_by(is_still_valid)
+            @pin.any.by(is_still_valid)
             def prop(self_or_cls: Any) -> int:
                 Foo.counter += 1
                 return 42
@@ -924,7 +806,7 @@ class TestExceptions:
     def test_property_error_inheritance(self) -> None:
         assert issubclass(ContextFaultError, PropertyError)
         assert issubclass(ReadOnlyError, PropertyError)
-        assert issubclass(AttributeException, PropertyError)
+        assert issubclass(AttributeExceptionError, PropertyError)
 
     def test_context_fault_error_catchable(self) -> None:
         class Foo:
@@ -953,7 +835,7 @@ class TestExceptions:
                 return self.nonexistent.attr
 
         obj = Foo()
-        with pytest.raises(AttributeException) as exc_info:
+        with pytest.raises(AttributeExceptionError) as exc_info:
             obj.prop
         assert hasattr(exc_info.value, "exception")
         assert isinstance(exc_info.value.exception, AttributeError)
@@ -1149,51 +1031,6 @@ class TestDescriptorInternals:
         assert descriptor.is_data is False
 
 
-class TestAsyncEdgeCases:
-    """Tests for async property edge cases."""
-
-    @pytest.mark.asyncio
-    async def test_pin_native_async_return_value(self) -> None:
-        class Foo:
-            @pin.native
-            async def prop(self) -> int:
-                return 42
-
-        obj = Foo()
-        result = obj.prop
-        assert asyncio.isfuture(result) or asyncio.iscoroutine(result)
-        assert await result == 42
-
-    @pytest.mark.asyncio
-    async def test_pin_native_async_exception(self) -> None:
-        class Foo:
-            @pin.native
-            async def prop(self) -> int:
-                raise ValueError("test error")
-
-        obj = Foo()
-        future = obj.prop
-        with pytest.raises(ValueError, match="test error"):
-            await future
-
-    @pytest.mark.asyncio
-    async def test_pin_native_async_caches_exception_future(self) -> None:
-        class Foo:
-            counter = 0
-
-            @pin.native
-            async def prop(self) -> int:
-                Foo.counter += 1
-                return 42
-
-        obj = Foo()
-        fut1 = obj.prop
-        fut2 = obj.prop
-        assert fut1 is fut2
-        assert await fut1 == 42
-        assert Foo.counter == 1
-
-
 class TestCachedSetOperations:
     """Tests for __set__ behavior on cached properties."""
 
@@ -1214,8 +1051,8 @@ class TestCachedSetOperations:
             def prop(cls) -> int:
                 return 42
 
-        Foo.prop = 100  # type: ignore
-        assert Foo.prop == 100  # type: ignore
+        Foo.prop = 100  # type: ignore[assignment]
+        assert Foo.prop == 100  # type: ignore[assignment]
 
     def test_manual_override_pin_any_instance(self) -> None:
         class Foo:
@@ -1256,7 +1093,7 @@ class TestCachedSetOperations:
 
         assert Foo.prop == 1
         assert Foo.prop == 1
-        Foo.prop = 100  # type: ignore
+        Foo.prop = 100  # type: ignore[assignment]
         assert Foo.prop == 100
 
     def test_manual_override_pin_post_instance_only(self) -> None:

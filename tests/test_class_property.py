@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import pytest
@@ -114,30 +113,18 @@ class TestClassProperty:
         assert desc.call(Foo) == 1
         assert desc.call(Foo) == 2
 
-    def test_call_wraps_coroutine(self) -> None:
-        async def async_fn(cls: type[Any]) -> str:
-            return "async"
-
-        class Foo:
-            prop = class_property(async_fn)
-
-        desc = Foo.__dict__["prop"]
-        result = desc.call(Foo)
-        assert asyncio.isfuture(result)
-        assert asyncio.get_event_loop().run_until_complete(result) == "async"
-
     def test_call_raises_attribute_exception(self) -> None:
         class Foo:
             @class_property
             def prop(cls) -> str:
-                return cls.nonexistent.attr  # type: ignore[attr-defined]
+                return cls.nonexistent.attr  # type: ignore[assignment][attr-defined]
 
         desc = Foo.__dict__["prop"]
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".") as exc_info:
             desc.call(Foo)
-        # AttributeException wraps AttributeError
+        # AttributeExceptionError wraps AttributeError
         assert type(exc_info.value).__name__ in (
-            "AttributeException",
+            "AttributeExceptionError",
             "AttributeError",
         )
 
@@ -188,8 +175,8 @@ class TestClassProperty:
             pass
 
         desc = Mixin.__dict__["prop"]
-        # get_node should resolve owner; since prop is not in Concrete.__dict__,
-        # get_owner returns Mixin
+        # get_node should resolve owner; since prop is not in
+        # Concrete.__dict__, get_owner returns Mixin
         assert desc.get_node(Concrete) is Mixin
 
 
@@ -336,29 +323,17 @@ class TestMixedProperty:
         assert desc.call(Foo) == 1
         assert desc.call(Foo) == 2
 
-    def test_call_wraps_coroutine(self) -> None:
-        async def async_fn(x: object) -> str:
-            return "async"
-
-        class Foo:
-            prop = mixed_property(async_fn)
-
-        desc = Foo.__dict__["prop"]
-        result = desc.call(Foo())
-        assert asyncio.isfuture(result)
-        assert asyncio.get_event_loop().run_until_complete(result) == "async"
-
     def test_call_raises_attribute_exception(self) -> None:
         class Foo:
             @mixed_property
             def prop(self_or_cls: Any) -> str:
-                return self_or_cls.nonexistent.attr  # type: ignore[attr-defined,union-attr]
+                return self_or_cls.nonexistent.attr  # type: ignore[assignment][attr-defined,union-attr]
 
         desc = Foo.__dict__["prop"]
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(Exception, match=r".") as exc_info:
             desc.call(Foo())
         assert type(exc_info.value).__name__ in (
-            "AttributeException",
+            "AttributeExceptionError",
             "AttributeError",
         )
 

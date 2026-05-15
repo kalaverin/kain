@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import time
 from typing import Any
 
@@ -66,10 +65,10 @@ class TestCustomCallbackMixin:
 
         # Accessing as class attribute yields bound methods; compare __func__
         assert (
-            class_cached_property.expired_by.__func__
+            class_cached_property.by.__func__
             is class_cached_property.by.__func__
         )
-        factory = class_cached_property.expired_by(cb)
+        factory = class_cached_property.by(cb)
         assert callable(factory)
 
 
@@ -165,18 +164,6 @@ class TestClassParentCachedProperty:
         assert desc.call(Foo) == 1
         assert desc.call(Foo) == 1
         assert Foo.counter == 1
-
-    def test_call_wraps_coroutine(self) -> None:
-        async def async_fn(cls: type[Any]) -> str:
-            return "async"
-
-        class Foo:
-            prop = class_parent_cached_property(async_fn)
-
-        desc = Foo.__dict__["prop"]
-        result = desc.call(Foo)
-        assert asyncio.isfuture(result)
-        assert asyncio.get_event_loop().run_until_complete(result) == "async"
 
     def test_set_and_delete(self) -> None:
         class Foo:
@@ -436,23 +423,6 @@ class TestCachedProperty:
         obj = Child()
         assert obj.prop == 52
         assert Parent.counter == 1
-
-    def test_async_caches_future(self) -> None:
-        class Foo:
-            counter = 0
-
-            @cached_property
-            async def prop(self) -> int:
-                Foo.counter += 1
-                return 42
-
-        obj = Foo()
-        fut1 = obj.prop
-        fut2 = obj.prop
-        assert fut1 is fut2
-        assert asyncio.isfuture(fut1)
-        assert asyncio.get_event_loop().run_until_complete(fut1) == 42
-        assert Foo.counter == 1
 
     def test_is_data_true(self) -> None:
         class Foo:

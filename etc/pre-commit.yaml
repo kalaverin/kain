@@ -40,6 +40,12 @@ repos:
         language: system
         pass_filenames: false
 
+      - id: check-pyrefly
+        name: check pyrefly (bad code detection)
+        entry: uv run --quiet pyrefly check --config etc/lint/pyrefly.toml src
+        language: system
+        pass_filenames: false
+
       - id: check-mypy
         name: check mypy (static check)
         entry: uv run --quiet mypy --cache-fine-grained --show-traceback --config
@@ -62,7 +68,7 @@ repos:
       - id: check-refurb
         name: check refurb (bad solutions detection)
         entry: uv run --quiet refurb --quiet --enable-all --python-version 3.12 --config-file
-          pyproject.toml --sort filename 'src/' -- --show-traceback
+          pyproject.toml --sort filename 'src/' -- --config-file etc/lint/mypy.toml
         language: system
         pass_filenames: false
 

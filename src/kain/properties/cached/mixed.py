@@ -13,30 +13,32 @@ Like the other cached families, there are two variants:
   :func:`kain.internals.get_owner` when accessed on a class.
 """
 
+# ruff: noqa: N801
+
 from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import suppress
 from functools import cached_property
-from typing import Any, Generic, TypeVar, overload, override
+from typing import TYPE_CHECKING, Any, TypeVar, cast, override
 
-from kain.internals import Is, Who, get_owner
+from kain import Is, Who
+from kain.internals import get_owner
 from kain.properties.cached.klass import (
     class_cached_property,
     class_parent_cached_property,
 )
-from kain.properties.primitives import ContextFaultError
+from kain.properties.primitives import ContextFaultError, parent_call
 
-__all__ = (
-    "mixed_cached_property",
-    "mixed_parent_cached_property",
-)
+__all__ = ("mixed_cached_property", "mixed_parent_cached_property")
 
-T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 R = TypeVar("R")
 
 
-class mixed_parent_cached_property(class_parent_cached_property[T, R]):
+class mixed_parent_cached_property[T_co](
+    class_parent_cached_property[T_co],
+):
     """Mixed cached descriptor with parent-aware class caching.
 
     When accessed on a class, the cache is stored on the *owning* class
@@ -45,73 +47,62 @@ class mixed_parent_cached_property(class_parent_cached_property[T, R]):
     """
 
     @cached_property
+    @override
     def title(self) -> str:
-        """Return a display title / header string for this property."""
         return f"mixed data-descriptor {Who.Addr(self)}".strip()
 
     @override
-    def header_with_context(self, node: object) -> str:
-        """Return a display title / header string for this property."""
+    def header_with_context(self, node: Any) -> str:
         return self.footer(node, "mixed")
 
     @override
-    def get_node(self, node: object) -> type[T] | T:
-        """Validate ``node`` is not ``None`` and resolve owner for classes.
-
-        Args:
-            node: The object to validate.
-
-        Returns:
-            The owning class if ``node`` is a class, otherwise ``node`` itself.
-        """
+    def get_node(self, node: Any) -> Any:
         if node is None:
-            msg = f"{self.header_with_context(node)}, {node=}"
+            msg = f"{self.header_with_context(node)}, node={node!r}"
             raise ContextFaultError(msg)
         result = get_owner(node, self.name)
-        return result if result is not None and Is.Class(node) else node  # type: ignore[return-value]
+        return result if result is not None and Is.Class(node) else node
 
-    def get_cache(self, node: object) -> dict[str, R | tuple[R, float]]:
-        """Return the cache dict whose name depends on whether ``node`` is a class.
-
-        Args:
-            node: The instance or class whose cache should be returned.
-
-        Returns:
-            The appropriate memoization dict for ``node``.
-        """
+    @override
+    def get_cache(self, node: Any) -> dict[str, Any]:
         self.get_node(node)
-        name = f'__{("instance", "class")[Is.Class(node)]}_memoized__'
-
+        name = f"__{('instance', 'class')[Is.Class(node)]}_memoized__"
         if hasattr(node, "__dict__"):
             with suppress(KeyError):
-                return node.__dict__[name]  # type: ignore[no-any-return]
-
-        cache: dict[str, R | tuple[R, float]] = {}
+                return cast("dict[str, Any]", node.__dict__[name])
+        cache: dict[str, Any] = {}
         setattr(node, name, cache)
         return cache
 
-    @overload
-    def __get__(self, instance: None, klass: type[T] | None = ...) -> R: ...
-    @overload
-    def __get__(self, instance: T, klass: type[T] | None = ...) -> R: ...
-    def __get__(
-        self,
-        instance: object | None,
-        klass: type[T] | None = None,
-    ) -> R:
-        """Descriptor protocol hook — ``call(instance or klass)``.
+    @override
+    def __get__(self, instance: Any, klass: Any = None) -> T_co:
+        return self.call(instance or klass)
 
-        Args:
-            instance: The instance accessing the descriptor.
-            klass: The owner class.
+    if TYPE_CHECKING:
 
-        Returns:
-            The cached or computed value.
-        """
-        return self.call(instance or klass)  # type: ignore[return-value]
+        @staticmethod
+        @override
+        def with_parent(
+            function: Callable[..., R],
+        ) -> mixed_parent_cached_property[R]: ...
 
 
-class mixed_cached_property(mixed_parent_cached_property[T, R], Generic[T, R]):
+def _mixed_parent_cached_property_with_parent[R](
+    function: Callable[..., R],
+) -> mixed_parent_cached_property[R]:
+    return mixed_parent_cached_property(
+        cast("Callable[[Any], R]", parent_call(function)),
+    )
+
+
+mixed_parent_cached_property.with_parent = staticmethod(  # type: ignore[method-assign]
+    _mixed_parent_cached_property_with_parent,
+)
+
+
+class mixed_cached_property[T_co](
+    mixed_parent_cached_property[T_co],
+):
     """Mixed cached descriptor that caches directly on the accessed node.
 
     This is the plain variant: no ``get_owner`` lookup is performed.
@@ -119,44 +110,34 @@ class mixed_cached_property(mixed_parent_cached_property[T, R], Generic[T, R]):
     was used to access the attribute.
     """
 
-    @overload
-    def __new__(
-        cls,
-        function: Callable[[T], R],
-        **kw: object,
-    ) -> mixed_cached_property[T, R]: ...
-    @overload
-    def __new__(
-        cls,
-        function: Callable[..., R],
-        **kw: object,
-    ) -> mixed_cached_property[Any, R]: ...
-    def __new__(
-        cls,
-        *args: object,
-        **kw: object,
-    ) -> mixed_cached_property[Any, R]:
-        """Create a new descriptor instance."""
-        return object.__new__(cls)
-
     @override
-    def get_node(self, node: object) -> type[T] | T:
-        """Validate ``node`` is not ``None`` and return it verbatim.
-
-        Args:
-            node: The object to validate.
-
-        Returns:
-            The validated node.
-        """
+    def get_node(self, node: Any) -> Any:
         if node is None:
-            msg = f"{self.header_with_context(node)}, {node=}"
+            msg = f"{self.header_with_context(node)}, node={node!r}"
             raise ContextFaultError(msg)
-        return node  # type: ignore[return-value]
+        return node
 
     @class_cached_property
-    def here(
-        cls: type[mixed_parent_cached_property[Any, Any]],
-    ) -> type[mixed_parent_cached_property[Any, Any]]:
-        """Return the parent cached-property class this variant inherits from."""
+    def here(cls) -> type[mixed_parent_cached_property[Any]]:  # noqa: N805
         return mixed_parent_cached_property
+
+    if TYPE_CHECKING:
+
+        @staticmethod
+        @override
+        def with_parent(
+            function: Callable[..., R],
+        ) -> mixed_cached_property[R]: ...
+
+
+def _mixed_cached_property_with_parent[R](
+    function: Callable[..., R],
+) -> mixed_cached_property[R]:
+    return mixed_cached_property(
+        cast("Callable[[Any], R]", parent_call(function)),
+    )
+
+
+mixed_cached_property.with_parent = staticmethod(  # type: ignore[method-assign]
+    _mixed_cached_property_with_parent,
+)

@@ -12,7 +12,6 @@ import sys
 import types
 from collections import ChainMap, OrderedDict, defaultdict, deque
 from collections.abc import Iterator
-from functools import partial
 from types import MappingProxyType, UnionType
 from typing import (
     Any,
@@ -39,7 +38,6 @@ from kain.internals import (
     get_module_name,
     get_mro,
     get_owner,
-    is_callable,
     is_collection,
     is_from_builtin,
     is_from_primitive,
@@ -68,8 +66,8 @@ class TestClassOfTypingVariants:
     """Runtime type-shape checks for ``class_of``."""
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             (42, int),
             ("s", str),
             (None, type(None)),
@@ -79,55 +77,18 @@ class TestClassOfTypingVariants:
             (..., type(...)),
             (NotImplemented, type(NotImplemented)),
             (TypeVar("T"), TypeVar),
-        ],
+        ),
     )
     def test_class_of(self, obj: Any, expected: type[Any]) -> None:
         assert class_of(obj) is expected
-
-
-class TestIsCallableTypingVariants:
-    """Callable recognition beyond plain functions."""
-
-    @pytest.mark.parametrize(
-        "obj",
-        [
-            lambda: 1,
-            print,
-            len,
-            partial(max, 10),
-            object().__str__,
-        ],
-    )
-    def test_callable_true(self, obj: Any) -> None:
-        assert is_callable(obj) is True
-
-    @pytest.mark.parametrize(
-        "obj",
-        [
-            1,
-            "hello",
-            None,
-            object(),
-            [1, 2, 3],
-        ],
-    )
-    def test_callable_false(self, obj: Any) -> None:
-        assert is_callable(obj) is False
-
-    def test_callable_custom_with_dunder_call(self) -> None:
-        class Caller:
-            def __call__(self) -> int:
-                return 1
-
-        assert is_callable(Caller()) is True
 
 
 class TestIsCollectionTypingVariants:
     """Collection detection for stdlib and duck-typed objects."""
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             ([1, 2], True),
             ((1, 2), True),
             ({"a": 1}, True),
@@ -139,7 +100,7 @@ class TestIsCollectionTypingVariants:
             (OrderedDict(), True),
             (ChainMap(), True),
             (MappingProxyType({"x": 1}), True),
-        ],
+        ),
     )
     def test_collection(self, obj: Any, expected: bool) -> None:
         assert is_collection(obj) is expected
@@ -169,8 +130,8 @@ class TestIsIterableTypingVariants:
     """Iterable recognition for generators, iterators, and duck types."""
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             ([1, 2], True),
             ("a", True),
             ({"a": 1}, True),
@@ -179,7 +140,7 @@ class TestIsIterableTypingVariants:
             (1, False),
             (None, False),
             (object(), False),
-        ],
+        ),
     )
     def test_iterable(self, obj: Any, expected: bool) -> None:
         assert is_iterable(obj) is expected
@@ -196,8 +157,8 @@ class TestIsMappingTypingVariants:
     """Mapping detection across stdlib specialisations."""
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             ({"a": 1}, True),
             (defaultdict(list), True),
             (OrderedDict(), True),
@@ -207,7 +168,7 @@ class TestIsMappingTypingVariants:
             ((1, 2), False),
             (set(), False),
             ("abc", False),
-        ],
+        ),
     )
     def test_mapping(self, obj: Any, expected: bool) -> None:
         assert is_mapping(obj) is expected
@@ -223,7 +184,7 @@ class TestIsPrimitiveTypingVariants:
 
     @pytest.mark.parametrize(
         "obj",
-        [
+        (
             True,
             False,
             None,
@@ -238,18 +199,18 @@ class TestIsPrimitiveTypingVariants:
             {1, 2},
             deque([1, 2]),
             bytearray(b"x"),
-        ],
+        ),
     )
     def test_primitive_true(self, obj: Any) -> None:
         assert is_primitive(obj) is True
 
     @pytest.mark.parametrize(
         "obj",
-        [
+        (
             object(),
             lambda: 1,
             type("Custom", (), {}),
-        ],
+        ),
     )
     def test_primitive_false(self, obj: Any) -> None:
         assert is_primitive(obj) is False
@@ -276,7 +237,7 @@ class TestIsInternalTypingVariants:
 
     @pytest.mark.parametrize(
         "obj",
-        [
+        (
             1,
             int,
             print,
@@ -288,17 +249,17 @@ class TestIsInternalTypingVariants:
             Any,
             UnionType,
             list[int],
-        ],
+        ),
     )
     def test_internal_true(self, obj: Any) -> None:
         assert is_internal(obj) is True
 
     @pytest.mark.parametrize(
         "obj",
-        [
+        (
             type("Custom", (), {}),
             lambda: 1,
-        ],
+        ),
     )
     def test_internal_false(self, obj: Any) -> None:
         assert is_internal(obj) is False
@@ -308,8 +269,8 @@ class TestIsSubclassTypingVariants:
     """``is_subclass`` exercised against the full typing zoo."""
 
     @pytest.mark.parametrize(
-        ("obj", "types", "expected"),
-        [
+        "obj, types, expected",
+        (
             # Basic
             (1, int, True),
             (1, str, False),
@@ -323,21 +284,20 @@ class TestIsSubclassTypingVariants:
             (None, int | str | None, True),
             (None, int | str, False),
             # Union via typing.Union
-            (1, Union[int, str], True),
-            (1, Union[str, bytes], False),
+            (1, Union[int, str], True),  # noqa: UP007
+            (1, Union[str, bytes], False),  # noqa: UP007
             # Optional
-            (1, Optional[int], True),
-            (None, Optional[int], True),
+            (1, Optional[int], True),  # noqa: UP045
+            (None, Optional[int], True),  # noqa: UP045
             # GenericAlias
             ([], list[int], True),
             ([], dict[str, int], False),
             ({}, dict[str, int], True),
             # typing.List
-            ([], list[int], True),
             ([], list[str], True),  # origin match
             # None types
             (1, None, False),
-        ],
+        ),
     )
     def test_subclass(
         self,
@@ -371,7 +331,7 @@ class TestGetModuleAndNameTypingVariants:
 
         instance = NoModule()
         # Explicitly wipe __module__ to see fallback behaviour
-        instance.__module__ = None  # type: ignore[attr-defined]
+        instance.__module__ = None  # type: ignore[assignment][attr-defined]
         mod = get_module(instance)
         assert mod is None or mod.__name__ is not None
 
@@ -380,8 +340,8 @@ class TestObjectNameTypingVariants:
     """``object_name`` for typing constructs and edge cases."""
 
     @pytest.mark.parametrize(
-        ("obj", "full", "expected_tail"),
-        [
+        "obj, full, expected_tail",
+        (
             (Any, True, "typing.Any"),
             (UnionType, True, "types.UnionType"),
             (list[int], True, "list"),
@@ -390,7 +350,7 @@ class TestObjectNameTypingVariants:
             (ParamSpec("P"), False, "P"),
             (Protocol, True, "typing.Protocol"),
             (Generic, True, "typing.Generic"),
-        ],
+        ),
     )
     def test_object_name(
         self,
@@ -468,23 +428,23 @@ class TestIsImportedModuleVariants:
 
     @pytest.mark.parametrize(
         "name",
-        [
+        (
             "os",
             "os.path",
             "sys",
             "collections.abc",
             "typing",
-        ],
+        ),
     )
     def test_imported_true(self, name: str) -> None:
         assert is_imported_module(name) is True
 
     @pytest.mark.parametrize(
         "name",
-        [
+        (
             "definitely_not_imported_module_12345",
             "os.definitely_not_imported_submodule_12345",
-        ],
+        ),
     )
     def test_imported_false(self, name: str) -> None:
         assert is_imported_module(name) is False
@@ -517,7 +477,7 @@ class TestGetMroVariants:
         assert get_mro(B, func=lambda x: x.__name__, glue=" -> ") == "A"
 
     def test_get_mro_with_stdlib_exclusion(self) -> None:
-        class A(Exception):
+        class A(Exception):  # noqa: N818
             pass
 
         mro = get_mro(A, exclude_stdlib=False)
@@ -528,15 +488,15 @@ class TestSimpleReprVariants:
     """Simplified repr for logging-like formatting."""
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             (None, None),
             (True, True),
             (False, False),
             ("hello", "hello"),
             (42, "42"),
             (3.14, "3.14"),
-        ],
+        ),
     )
     def test_simple_repr(self, obj: Any, expected: Any) -> None:
         assert simple_repr(obj) == expected
@@ -620,7 +580,7 @@ class TestIterInheritanceVariants:
         assert result == []
 
     def test_iter_inheritance_no_exclude_stdlib(self) -> None:
-        class A(Exception):
+        class A(Exception):  # noqa: N818
             pass
 
         result = list(iter_inheritance(A, exclude_stdlib=False))
@@ -703,13 +663,13 @@ class TestToAsciiAndBytesVariants:
     """Byte / string coercion with charset support."""
 
     @pytest.mark.parametrize(
-        ("inp", "charset", "expected"),
-        [
+        "inp, charset, expected",
+        (
             ("hello", None, "hello"),
             (b"hello", None, "hello"),
             ("café", "utf-8", "café"),
             ("café".encode(), "utf-8", "café"),
-        ],
+        ),
     )
     def test_to_ascii(
         self,
@@ -723,12 +683,12 @@ class TestToAsciiAndBytesVariants:
         assert to_ascii(inp, **kw) == expected
 
     @pytest.mark.parametrize(
-        ("inp", "charset", "expected"),
-        [
+        "inp, charset, expected",
+        (
             ("hello", None, b"hello"),
             (b"hello", None, b"hello"),
             ("café", "utf-8", "café".encode()),
-        ],
+        ),
     )
     def test_to_bytes(
         self,
@@ -827,8 +787,8 @@ class TestGenericAliasAdvanced:
     """Advanced ``GenericAlias`` behaviours."""
 
     @pytest.mark.parametrize(
-        ("alias", "obj", "expected"),
-        [
+        "alias, obj, expected",
+        (
             (list[int], [1, 2], True),
             (list[int], (1, 2), False),
             (dict[str, int], {"a": 1}, True),
@@ -837,7 +797,7 @@ class TestGenericAliasAdvanced:
             (set[int], [1, 2], False),
             (tuple[int, ...], (1, 2), True),
             (tuple[int, ...], [1, 2], False),
-        ],
+        ),
     )
     def test_is_subclass_generic_alias(
         self,
@@ -856,22 +816,22 @@ class TestUnionTypeAdvanced:
     """``UnionType`` (pipe syntax) vs ``typing.Union``."""
 
     @pytest.mark.parametrize(
-        ("obj", "types", "expected"),
-        [
+        "obj, types, expected",
+        (
             (1, int | str, True),
             (None, int | str | None, True),
             (None, int | str, False),
             ("x", str | int | bytes, True),
             (3.14, int | str, False),
-        ],
+        ),
     )
     def test_union_type(self, obj: Any, types: Any, expected: bool) -> None:
         assert is_subclass(obj, types) is expected
 
     def test_union_type_vs_typing_union(self) -> None:
-        assert is_subclass(1, Union[int, str]) is True
+        assert is_subclass(1, Union[int, str]) is True  # noqa: UP007
         assert is_subclass(1, int | str) is True
-        assert is_subclass(None, Optional[int]) is True
+        assert is_subclass(None, Optional[int]) is True  # noqa: UP045
         assert is_subclass(None, int | None) is True
 
 
@@ -879,15 +839,15 @@ class TestOptionalAdvanced:
     """Advanced ``Optional`` checks."""
 
     @pytest.mark.parametrize(
-        ("obj", "types", "expected"),
-        [
-            (1, Optional[int], True),
-            (None, Optional[int], True),
-            ("x", Optional[int], False),
-            (0, Optional[int], True),
-            ("", Optional[str], True),
-            (None, Optional[str], True),
-        ],
+        "obj, types, expected",
+        (
+            (1, Optional[int], True),  # noqa: UP045
+            (None, Optional[int], True),  # noqa: UP045
+            ("x", Optional[int], False),  # noqa: UP045
+            (0, Optional[int], True),  # noqa: UP045
+            ("", Optional[str], True),  # noqa: UP045
+            (None, Optional[str], True),  # noqa: UP045
+        ),
     )
     def test_optional(self, obj: Any, types: Any, expected: bool) -> None:
         assert is_subclass(obj, types) is expected
@@ -949,13 +909,13 @@ class TestIsSubclassExoticTypes:
     """``is_subclass`` with exotic typing constructs."""
 
     @pytest.mark.parametrize(
-        ("obj", "types", "expected"),
-        [
+        "obj, types, expected",
+        (
             ([1], list, True),
             ({"a": 1}, dict, True),
             (42, Any, True),
             (None, type(None), True),
-        ],
+        ),
     )
     def test_exotic_types(self, obj: Any, types: Any, expected: bool) -> None:
         assert is_subclass(obj, types) is expected
@@ -988,7 +948,7 @@ class TestGetAttrDescriptors:
 
     def test_get_attr_custom_descriptor(self) -> None:
         class Descriptor:
-            def __get__(self, obj: Any, type: type[Any] | None = None) -> int:
+            def __get__(self, obj: Any, kind: type[Any] | None = None) -> int:
                 return 42
 
         class A:
@@ -1113,7 +1073,7 @@ class TestIterInheritanceABC:
     def test_iter_inheritance_with_abc_custom(self) -> None:
         from collections.abc import Mapping, Sequence
 
-        class MyMap(Mapping):  # type: ignore[type-arg]
+        class MyMap(Mapping):  # type: ignore[assignment][type-arg]
             def __getitem__(self, key: Any) -> Any:
                 return key
 
@@ -1123,7 +1083,7 @@ class TestIterInheritanceABC:
             def __len__(self) -> int:
                 return 0
 
-        class MySeq(Sequence):  # type: ignore[type-arg]
+        class MySeq(Sequence):  # type: ignore[assignment][type-arg]
             def __getitem__(self, key: Any) -> Any:
                 return 0
 
@@ -1139,7 +1099,7 @@ class TestIterInheritanceABC:
     def test_iter_inheritance_abc_exclude(self) -> None:
         from collections.abc import Mapping
 
-        class MyMap(Mapping):  # type: ignore[type-arg]
+        class MyMap(Mapping):  # type: ignore[assignment][type-arg]
             def __getitem__(self, key: Any) -> Any:
                 return key
 
@@ -1161,7 +1121,7 @@ class TestIterInheritanceABC:
     def test_iter_inheritance_abc_include(self) -> None:
         from collections.abc import Mapping
 
-        class MyMap(Mapping):  # type: ignore[type-arg]
+        class MyMap(Mapping):  # type: ignore[assignment][type-arg]
             def __getitem__(self, key: Any) -> Any:
                 return key
 
@@ -1183,7 +1143,7 @@ class TestIterInheritanceABC:
     def test_iter_inheritance_multiple_abc(self) -> None:
         from collections.abc import Mapping, MutableMapping
 
-        class MyMap(MutableMapping):  # type: ignore[type-arg]
+        class MyMap(MutableMapping):  # type: ignore[assignment][type-arg]
             def __getitem__(self, key: Any) -> Any:
                 return key
 
@@ -1237,7 +1197,7 @@ class TestIsInternalTypingAdvanced:
 
     @pytest.mark.parametrize(
         "obj",
-        [
+        (
             Any,
             UnionType,
             list[int],
@@ -1245,7 +1205,7 @@ class TestIsInternalTypingAdvanced:
             Literal[1],
             Protocol,
             Generic,
-        ],
+        ),
     )
     def test_internal_true_typing(self, obj: Any) -> None:
         assert is_internal(obj) is True
@@ -1262,8 +1222,8 @@ class TestWhoIsAdvancedTyping:
     """Advanced ``who_is`` for typing constructs."""
 
     @pytest.mark.parametrize(
-        ("obj", "expected"),
-        [
+        "obj, expected",
+        (
             (Any, "typing.Any"),
             (UnionType, "types.UnionType"),
             (list[int], "list"),
@@ -1272,7 +1232,7 @@ class TestWhoIsAdvancedTyping:
             (Generic, "typing.Generic"),
             (TypeVar("T"), "tests.test_internals_extended.T"),
             (ParamSpec("P"), "tests.test_internals_extended.P"),
-        ],
+        ),
     )
     def test_who_is_typing(self, obj: Any, expected: str) -> None:
         assert who_is(obj) == expected
@@ -1282,8 +1242,8 @@ class TestObjectNameAdvancedTyping:
     """Advanced ``object_name`` for typing constructs."""
 
     @pytest.mark.parametrize(
-        ("obj", "full", "expected"),
-        [
+        "obj, full, expected",
+        (
             (Any, True, "typing.Any"),
             (UnionType, True, "types.UnionType"),
             (list[int], True, "list"),
@@ -1292,7 +1252,7 @@ class TestObjectNameAdvancedTyping:
             (ParamSpec("P"), False, "P"),
             (Protocol, True, "typing.Protocol"),
             (Generic, True, "typing.Generic"),
-        ],
+        ),
     )
     def test_object_name_typing(
         self,
@@ -1308,7 +1268,7 @@ class TestObjectNameAdvancedTyping:
         assert object_name(alias) == "types.UnionType"
 
     def test_object_name_optional(self) -> None:
-        alias = Optional[int]
+        alias = Optional[int]  # noqa: UP045
         assert object_name(alias) == "typing.Optional"
 
 
@@ -1349,7 +1309,7 @@ class TestIsMappingAdvanced:
 
     def test_mapping_empty(self) -> None:
         assert is_mapping({}) is True
-        assert is_mapping(dict()) is True
+        assert is_mapping({}) is True
 
         class MyDict(dict):
             pass
@@ -1371,7 +1331,7 @@ class TestIsPrimitiveAdvanced:
 
     @pytest.mark.parametrize(
         "obj",
-        [
+        (
             True,
             False,
             None,
@@ -1386,19 +1346,19 @@ class TestIsPrimitiveAdvanced:
             set(),
             deque(),
             bytearray(),
-        ],
+        ),
     )
     def test_primitive_empty_and_falsy(self, obj: Any) -> None:
         assert is_primitive(obj) is True
 
     @pytest.mark.parametrize(
         "obj",
-        [
+        (
             object(),
             lambda: 1,
             type("Custom", (), {}),
             Exception(),
-        ],
+        ),
     )
     def test_primitive_false_custom(self, obj: Any) -> None:
         assert is_primitive(obj) is False
@@ -1455,7 +1415,7 @@ class TestGetMroAdvanced:
         assert get_mro(B, func=lambda x: x.__name__, glue=" -> ") == "A"
 
     def test_get_mro_with_stdlib_exclusion(self) -> None:
-        class A(Exception):
+        class A(Exception):  # noqa: N818
             pass
 
         mro = get_mro(A, exclude_stdlib=False)
