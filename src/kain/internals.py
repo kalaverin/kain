@@ -33,7 +33,7 @@ from re import sub
 from sys import modules, stderr, stdin, stdout
 from sysconfig import get_paths
 from types import FunctionType, GenericAlias, LambdaType, ModuleType, UnionType
-from typing import Any, cast, get_args, get_origin
+from typing import Any, get_args, get_origin, overload
 
 Collections: tuple[type, ...] = deque, dict, list, set, tuple, bytearray
 """Built-in mutable and immutable collection types."""
@@ -696,7 +696,27 @@ def to_bytes(x: bytes | str, /, charset: str | None = None) -> bytes:
     return x.encode(charset or "ascii")
 
 
-def unique(
+@overload
+def unique[T](
+    iterable: Iterable[T],
+    /,
+    key: None = None,
+    include: Iterable[T] | None = None,
+    exclude: Iterable[T] | None = None,
+) -> Iterator[T]: ...
+
+
+@overload
+def unique[T, H](
+    iterable: Iterable[T],
+    /,
+    key: Callable[[T], H],
+    include: Iterable[H] | None = None,
+    exclude: Iterable[H] | None = None,
+) -> Iterator[T]: ...
+
+
+def unique[T, H](
     iterable: Iterable[Any],
     /,
     key: Callable[[Any], Any] | None = None,
@@ -705,8 +725,7 @@ def unique(
 ) -> Iterator[Any]:
     """Yield unique elements from *iterable* based on an optional *key*.
 
-    For mappings yields ``(key, value)`` pairs.  Already-seen keys
-    (or elements when *key* is omitted) are skipped.
+    Already-seen keys (or elements when *key* is omitted) are skipped.
 
     Returns:
         An iterator of unique items from *iterable*.

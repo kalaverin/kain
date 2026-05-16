@@ -5,7 +5,7 @@ from collections.abc import (
 )
 from functools import cache
 from types import ModuleType
-from typing import Any
+from typing import Any, overload
 
 __all__ = (
     "get_attr",
@@ -63,10 +63,19 @@ def get_owner(obj: Any, name: str, **kw: Any) -> Any | None: ...
 def get_attr(obj: Any, name: str, default: Any = None, **kw: Any) -> Any: ...
 def to_ascii(x: bytes | str, /, charset: str | None = None) -> str: ...
 def to_bytes(x: bytes | str, /, charset: str | None = None) -> bytes: ...
-def unique(
-    iterable: Iterable[Any],
+@overload
+def unique[T](
+    iterable: Iterable[T],
     /,
-    key: Callable[[Any], Any] | None = None,
-    include: Iterable[Any] | None = None,
-    exclude: Iterable[Any] | None = None,
-) -> Iterator[Any]: ...
+    key: None = None,
+    include: Iterable[T] | None = None,
+    exclude: Iterable[T] | None = None,
+) -> Iterator[T]: ...
+@overload
+def unique[T, H](
+    iterable: Iterable[T],
+    /,
+    key: Callable[[T], H],
+    include: Iterable[H] | None = None,
+    exclude: Iterable[H] | None = None,
+) -> Iterator[T]: ...
