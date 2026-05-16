@@ -90,4 +90,4 @@ test:
 %:
 	@just $@
 
-DEFAULT_GOAL := default
+.DEFAULT_GOAL := default
