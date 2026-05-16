@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, TypeVar, final, overload
+from typing import Any, TypeVar, final, overload, override
 
 from kain.properties.cached import (
     cached_property,
@@ -75,6 +75,7 @@ class pin[T_co](bound_property[T_co]):  # noqa: N801
         klass: Any = ...,
     ) -> T_co: ...
 
+    @override
     def __get__(
         self,
         node: object | None,

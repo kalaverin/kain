@@ -612,9 +612,17 @@ def _get_attribute_from_inheritance(
     kw.setdefault("exclude_stdlib", False)
 
     counter = 0
+    attr = None
     for child in iter_inheritance(obj, **kw):
         try:
             attr = child.__dict__[name]
+
+        except AttributeError:
+            if name not in child.__slots__:
+                raise TypeError(
+                    f"{who_is(child)}.{name} is defined in __slots__, "
+                    "which isn't supported by get_attr/get_owner",
+                ) from None
 
         except KeyError:
             continue

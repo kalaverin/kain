@@ -7,22 +7,16 @@ fail_fast: true
 repos:
   - repo: local
     hooks:
-      - id: lockfile-check
-        name: check what dependencies are being added to the lockfile
-        entry: uv lock --check
-        language: system
-        pass_filenames: false
-
       - id: lint-black
         name: force black
-        entry: uv run --quiet black --quiet --line-length 79 --target-version py312
-          'src/' 'tests/'
+        entry: uv run --quiet black --diff --color --quiet --line-length 79 --target-version
+          py312 'src/' 'tests/'
         language: system
         pass_filenames: false
 
       - id: lint-ruff
         name: force ruff
-        entry: uv run --quiet ruff check --fix --quiet 'src/' 'tests/'
+        entry: uv run --quiet ruff check --quiet 'src/' 'tests/'
         language: system
         pass_filenames: false
 

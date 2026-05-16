@@ -28,7 +28,6 @@ Key concepts
 from __future__ import annotations
 
 from collections.abc import Callable
-from contextlib import suppress
 from functools import cached_property, wraps
 from inspect import iscoroutinefunction
 from typing import Any, Self, TypeVar, cast, overload, override

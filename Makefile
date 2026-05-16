@@ -1,4 +1,4 @@
-.PHONY: default help install lint test
+.PHONY: check default help install lint test
 
 help:
 	@just default
@@ -9,6 +9,30 @@ install:
 
 lint:
 	@uv run --quiet \
+		black \
+		--quiet \
+		--line-length 79 \
+		--target-version py312 \
+	'src/' 'tests/' \
+	|| true
+
+	@uv run --quiet \
+	  ruff check \
+			--quiet \
+			--fix \
+		'src/' 'tests/' \
+		|| true
+
+	@uv run --quiet \
+	  yamlfix \
+			--config-file etc/lint/yamlfix.toml \
+			--exclude '.*/**/*.yml' \
+			--exclude '.*/**/*.yaml' \
+		. \
+		|| true
+
+check:
+	@uv run --quiet \
 	  pre-commit run \
 	--config etc/pre-commit.yaml \
 	--all
@@ -17,7 +41,7 @@ stubs:
 	@make clean-stubs || true
 	@uv run --quiet righttyper \
 	  --verbose \
-    --python-version 3.12 \
+	--python-version 3.12 \
 		--generate-stubs \
 		--overwrite \
 		--replace-dict \
