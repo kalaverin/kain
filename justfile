@@ -31,8 +31,8 @@ migrate:
 [group('maintenance')]
 clean:
     @rm -rf .*_cache/
-    @find . -type d -name "__pycache__" -exec rm -rf {} +
-    @find . -type f -name "*.pyc" -exec rm -f {} +
+    @find . -type d -name "__pycache__" -delete
+    @find . -type f -name "*.pyc" -delete
 
 # upgrade dependencies graph
 [group('packaging')]
