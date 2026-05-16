@@ -17,14 +17,14 @@ lint:
 	|| true
 
 	@uv run --quiet \
-	  ruff check \
+		ruff check \
 			--quiet \
 			--fix \
 		'src/' 'tests/' \
 		|| true
 
 	@uv run --quiet \
-	  yamlfix \
+		yamlfix \
 			--config-file etc/lint/yamlfix.toml \
 			--exclude '.*/**/*.yml' \
 			--exclude '.*/**/*.yaml' \
@@ -33,7 +33,7 @@ lint:
 
 check:
 	@uv run --quiet \
-	  pre-commit run \
+		pre-commit run \
 	--config etc/pre-commit.yaml \
 	--all
 
@@ -90,4 +90,4 @@ test:
 %:
 	@just $@
 
-.DEFAULT_GOAL := default
+DEFAULT_GOAL := default

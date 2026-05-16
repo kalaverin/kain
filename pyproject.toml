@@ -201,4 +201,3 @@ possibly-missing-attribute = "ignore"
 default-groups = [
   "development"
 ]
-index-strategy = "unsafe-best-match"
