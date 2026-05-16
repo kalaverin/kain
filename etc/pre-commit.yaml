@@ -207,7 +207,7 @@ repos:
           - --line-length
           - '79'
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.11.2
+    rev: 0.11.14
     hooks:
       - id: uv-lock
         name: sync pyproject.toml and lock project dependencies to uv.lock

@@ -37,11 +37,6 @@ clean:
 # upgrade dependencies graph
 [group('packaging')]
 upgrade:
-    @echo "upgrading mise dependencies.."
-    @mise upgrade \
-        --quiet \
-        --yes \
-
     @echo "updating pre-commit hooks.."
     @uv run --quiet \
     pre-commit autoupdate \
