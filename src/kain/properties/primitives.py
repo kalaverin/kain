@@ -351,22 +351,27 @@ class bound_property[T_co](BaseProperty[T_co]):
         node: object | None,
         klass: Any = Nothing,
     ) -> bound_property[T_co] | T_co:
-
         if node is None:
             raise ContextFaultError(self.header_with_context(klass))
 
-        if not hasattr(node, "__dict__"):
+        cache = getattr(node, "__dict__", None)
+        if cache is None:
             raise TypeError(
-                f"{self.header_with_context(node)}, {node=} has no __dict__",
+                f"{self.header_with_context(node)} has no __dict__",
             )
 
-        with suppress(KeyError):
-            return node.__dict__[self.name]
+        try:
+            return cache[self.name]
 
-        value = self.function(node)
-        node.__dict__[self.name] = value
-        return value
+        except KeyError:
+            value = self.function(node)
+            cache[self.name] = value
+            return value
 
-    def __delete__(self, node: Any) -> None:
+    def __set__(self, node: object, value: Any) -> None:
+        msg = f"{self.header_with_context(node)}: setter called"
+        raise ReadOnlyError(msg)
+
+    def __delete__(self, node: object) -> None:
         msg = f"{self.header_with_context(node)}: deleter called"
         raise ReadOnlyError(msg)

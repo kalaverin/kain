@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
-from typing import Any, TypeVar, final, overload, override
+from typing import Any, TypeVar, final, overload
 
 from kain.properties.cached import (
     cached_property,
@@ -76,7 +75,6 @@ class pin[T_co](bound_property[T_co]):  # noqa: N801
         klass: Any = ...,
     ) -> T_co: ...
 
-    @override
     def __get__(
         self,
         node: object | None,
@@ -85,14 +83,16 @@ class pin[T_co](bound_property[T_co]):  # noqa: N801
         if node is None:
             raise ContextFaultError(self.header_with_context(klass))
 
-        if not hasattr(node, "__dict__"):
+        cache = getattr(node, "__dict__", None)
+        if cache is None:
             raise TypeError(
-                f"{self.header_with_context(node)}, {node=} has no __dict__",
+                f"{self.header_with_context(node)} has no __dict__",
             )
 
-        with suppress(KeyError):
-            return node.__dict__[self.name]
+        try:
+            return cache[self.name]
 
-        value = self.function(node)
-        node.__dict__[self.name] = value
-        return value
+        except KeyError:
+            value = self.function(node)
+            cache[self.name] = value
+            return value
