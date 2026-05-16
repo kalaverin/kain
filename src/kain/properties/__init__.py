@@ -24,6 +24,7 @@ from kain.properties.primitives import (
     PropertyError,
     ReadOnlyError,
     bound_property,
+    parent_call,
 )
 from kain.properties.proxy_to import proxy_to
 
@@ -41,6 +42,7 @@ __all__ = (
     "mixed_cached_property",
     "mixed_parent_cached_property",
     "mixed_property",
+    "parent_call",
     "pin",
     "post_cached_property",
     "post_parent_cached_property",

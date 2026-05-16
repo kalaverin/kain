@@ -36,7 +36,7 @@ from kain import Is, Who
 from kain.classes import Missing
 from kain.internals import get_attr
 
-__all__ = ("bound_property",)
+__all__ = ("bound_property", "parent_call")
 Nothing = Missing()
 
 T_co = TypeVar("T_co", covariant=True)
