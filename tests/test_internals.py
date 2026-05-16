@@ -648,7 +648,7 @@ class TestUnique:
 
     def test_unique_dict(self) -> None:
         result = list(unique({"a": 1, "b": 2}))
-        assert result == [("a", 1), ("b", 2)]
+        assert result == ["a", "b"]
 
     def test_unique_include(self) -> None:
         assert list(unique([1, 2, 3, 4], include=[1, 2])) == [1, 2]
@@ -1117,8 +1117,7 @@ class TestUniqueEdgeCases:
     def test_unique_mapping_preserve_order(self) -> None:
         mapping = {"z": 1, "a": 2}
         result = list(unique(mapping))
-        keys = [k for k, v in result]
-        assert keys == ["z", "a"]
+        assert result == ["z", "a"]
 
     def test_unique_include_tuple(self) -> None:
         assert list(unique([1, 2, 3, 4], include=(1, 2))) == [1, 2]

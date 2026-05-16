@@ -722,14 +722,9 @@ def unique(
 
     excluded = exclude_set.__contains__
     included = include_set.__contains__
-    is_dict = is_mapping(iterable)
 
-    for element in iterable:  # type: ignore[attr-defined]
-        k = key(element) if key else element  # type: ignore[arg-type]
+    for element in iterable:
+        k = key(element) if key else element
         if not excluded(k) and (skip or included(k)):
-            yield (
-                (element, cast("Mapping[Any, Any]", iterable)[element])
-                if is_dict
-                else element
-            )
+            yield element
             exclude_set.add(k)

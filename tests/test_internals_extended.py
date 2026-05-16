@@ -721,7 +721,7 @@ class TestUniqueVariants:
 
     def test_unique_dict(self) -> None:
         result = list(unique({"a": 1, "b": 2}))
-        assert result == [("a", 1), ("b", 2)]
+        assert result == ["a", "b"]
 
     def test_unique_include(self) -> None:
         assert list(unique([1, 2, 3, 4], include=[1, 2])) == [1, 2]
@@ -744,8 +744,8 @@ class TestUniqueVariants:
     def test_unique_mapping_with_key(self) -> None:
         mapping = {"a": 1, "b": 2, "c": 3}
         result = list(unique(mapping, key=lambda k: k))
-        assert ("a", 1) in result
-        assert ("b", 2) in result
+        assert "a" in result
+        assert "b" in result
 
     def test_unique_empty(self) -> None:
         assert list(unique([])) == []

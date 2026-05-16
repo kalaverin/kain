@@ -258,11 +258,11 @@ def test_unique_with_exclude_set() -> None:
 
 
 @pytest.mark.unit
-def test_unique_on_mapping_yields_key_value_pairs() -> None:
+def test_unique_on_mapping_yields_keys() -> None:
     """
     Given: a mapping
     When: calling unique on it
-    Then: yields (key, value) pairs
+    Then: yields keys
     """
     # --- Arrange ---
     mapping = {"a": 1, "b": 2}
@@ -271,7 +271,7 @@ def test_unique_on_mapping_yields_key_value_pairs() -> None:
     result = list(unique(mapping))
 
     # --- Assert ---
-    assert set(result) == {("a", 1), ("b", 2)}
+    assert set(result) == {"a", "b"}
 
 
 @pytest.mark.unit
