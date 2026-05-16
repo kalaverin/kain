@@ -4,7 +4,7 @@ from collections.abc import Callable
 from functools import cached_property
 from typing import Any, Self, overload, override
 
-__all__ = ("bound_property",)
+__all__ = ("bound_property", "parent_call")
 Nothing: Any
 T_co: Any
 

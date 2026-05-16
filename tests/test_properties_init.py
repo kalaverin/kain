@@ -28,7 +28,7 @@ class TestPropertiesAll:
         assert isinstance(properties.__all__, tuple)
 
     def test_all_length(self) -> None:
-        assert len(properties.__all__) == 19
+        assert len(properties.__all__) == 20
 
     def test_all_has_no_duplicates(self) -> None:
         assert len(properties.__all__) == len(set(properties.__all__))
@@ -48,6 +48,7 @@ class TestPropertiesAll:
             "mixed_cached_property",
             "mixed_parent_cached_property",
             "mixed_property",
+            "parent_call",
             "pin",
             "post_cached_property",
             "post_parent_cached_property",
