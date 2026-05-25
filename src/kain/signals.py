@@ -37,7 +37,7 @@ from signal import signal as bind
 from types import FrameType, TracebackType
 from typing import Any, Protocol
 
-from kain import Who
+from kain import who
 from kain.classes import Singleton
 
 __all__ = (
@@ -143,7 +143,7 @@ class on_quit(metaclass=Singleton):  # noqa: N801
                 hook(exc_type, exc_value, traceback)
             except Exception as e:  # noqa: BLE001
                 warnings.warn(
-                    f"{Who.Is(hook)}: {e!r}",
+                    f"{who.Is(hook)}: {e!r}",
                     RuntimeWarning,
                     stacklevel=2,
                 )
@@ -250,7 +250,7 @@ class on_quit(metaclass=Singleton):  # noqa: N801
                     func()
                 except BaseException as e:  # noqa: BLE001
                     warnings.warn(
-                        f"{Who.Is(func)}: {e!r}",
+                        f"{who.Is(func)}: {e!r}",
                         RuntimeWarning,
                         stacklevel=2,
                     )

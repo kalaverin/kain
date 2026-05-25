@@ -1,7 +1,7 @@
 from threading import RLock
 from typing import Any, override
 
-from kain import Who
+from kain import who
 
 __all__ = ("Missing", "Nothing", "Singleton")
 
@@ -24,7 +24,7 @@ class Missing:
 
     @override
     def __repr__(self) -> str:
-        return f"<{Who.Name(self, addr=True)}>"
+        return f"<{who.Name(self, addr=True)}>"
 
 
 Nothing: Missing = Missing()

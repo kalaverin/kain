@@ -32,7 +32,7 @@ from functools import cached_property, wraps
 from inspect import iscoroutinefunction
 from typing import Any, Self, TypeVar, cast, overload, override
 
-from kain import Is, Who
+from kain import isis, who
 from kain.classes import Missing
 from kain.internals import get_attr
 
@@ -106,23 +106,23 @@ def extract_wrapped(obj: Any) -> Callable[..., Any]:
             descriptor types.
     """
 
-    if Is.subclass(obj, bound_property):
+    if isis.subclass(obj, bound_property):
         return obj.__get__
 
-    if Is.subclass(obj, BaseProperty):
+    if isis.subclass(obj, BaseProperty):
         return obj.call
 
-    if Is.subclass(obj, property):
+    if isis.subclass(obj, property):
         return obj.fget
 
-    if Is.subclass(obj, cached_property):
+    if isis.subclass(obj, cached_property):
         return obj.func
 
     msg = (
-        f"couldn't extract wrapped function from {Who.Is(obj)}: "
+        f"couldn't extract wrapped function from {who.Is(obj)}: "
         "replace it with @property, @cached_property, "
-        f"@{Who.Is(bound_property)}, or other descriptor derived "
-        f"from {Who.Is(BaseProperty)}"
+        f"@{who.Is(bound_property)}, or other descriptor derived "
+        f"from {who.Is(BaseProperty)}"
     )
     raise NotImplementedError(msg)
 
@@ -167,10 +167,10 @@ def parent_call(func: Callable[..., Any]) -> Callable[..., Any]:
     def parent_caller(node: Any, *args: Any, **kw: Any) -> Any:
         try:
             desc = get_attr(
-                Is.classOf(node),
+                isis.classOf(node),
                 get_name(func),
                 exclude_self=True,
-                index=get_name(func) not in Is.classOf(node).__dict__,
+                index=get_name(func) not in isis.classOf(node).__dict__,
             )
             return func(
                 node,
@@ -181,9 +181,9 @@ def parent_call(func: Callable[..., Any]) -> Callable[..., Any]:
 
         except RecursionError as e:
             msg = (
-                f"{Who.Is(node)}.{get_name(func)} call real {Who.Is(func)}, "
-                f"couldn't reach parent descriptor; maybe {Who.Is(func)} "
-                f"it's mixin of {Who.Is(node)}?"
+                f"{who.Is(node)}.{get_name(func)} call real {who.Is(func)}, "
+                f"couldn't reach parent descriptor; maybe {who.Is(func)} "
+                f"it's mixin of {who.Is(node)}?"
             )
             raise RecursionError(msg) from e
 
@@ -219,10 +219,10 @@ def invocation_context_check(func: Callable[..., Any]) -> Callable[..., Any]:
     def context(self: Any, node: Any, *args: Any, **kw: Any) -> Any:
 
         if (klass := self.klass) is not None and (
-            node is None or klass != Is.Class(node)
+            node is None or klass != isis.Class(node)
         ):
             msg = (
-                f"{Who.Is(func)} exception, "
+                f"{who.Is(func)} exception, "
                 f"{self.header_with_context(node)}, {node=}"
             )
             if node is None and (not klass):
@@ -275,15 +275,15 @@ class BaseProperty[T_co]:
         try:
             return f"{self.title}({self.function!a})"
         except Exception:  # noqa: BLE001
-            return f"{self.title}({Who.Is(self.function)})"
+            return f"{self.title}({who.Is(self.function)})"
 
     def header_with_context(self, node: Any) -> str:
         raise NotImplementedError
 
     def footer(self, node: Any, mode: str = "undefined") -> str:
         if node is not None:
-            mode = ("instance", "class")[Is.Class(node)]
-        return f"{self.header} called with {mode} context ({Who.Addr(node)})"
+            mode = ("instance", "class")[isis.Class(node)]
+        return f"{self.header} called with {mode} context ({who.Addr(node)})"
 
     def call(self, node: Any, *args: Any, **kw: Any) -> T_co:
         raise NotImplementedError
@@ -316,7 +316,7 @@ class bound_property[T_co](BaseProperty[T_co]):
     def __init__(self, function: Callable[[Any], T_co]) -> None:
         if iscoroutinefunction(function):
             msg = (
-                f"{Who.Is(function)} is coroutine function, "
+                f"{who.Is(function)} is coroutine function, "
                 "you must use @pin.native instead of just @pin"
             )
             raise TypeError(msg)
@@ -325,7 +325,7 @@ class bound_property[T_co](BaseProperty[T_co]):
     @cached_property
     @override
     def title(self) -> str:
-        return f"instance just-replace descriptor {Who.Addr(self)}"
+        return f"instance just-replace descriptor {who.Addr(self)}"
 
     @override
     def header_with_context(self, node: Any) -> str:

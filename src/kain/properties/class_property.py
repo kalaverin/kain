@@ -22,7 +22,7 @@ from typing import (
     override,
 )
 
-from kain import Is, Who
+from kain import isis, who
 from kain.internals import get_owner
 from kain.properties.primitives import (
     AttributeExceptionError,
@@ -61,14 +61,14 @@ class class_property[T_co](BaseProperty[T_co]):
     @cached_property
     @override
     def title(self) -> str:
-        return f"class descriptor {Who.Addr(self)}".strip()
+        return f"class descriptor {who.Addr(self)}".strip()
 
     @override
     def header_with_context(self, node: Any) -> str:
         return self.footer(node)
 
     def get_node(self, node: Any) -> Any:
-        if node is None or not Is.Class(node):
+        if node is None or not isis.Class(node):
             msg = f"{self.header_with_context(node)}, node={node!r}"
             raise ContextFaultError(msg)
         result = get_owner(node, self.name)
@@ -132,7 +132,7 @@ class mixed_property[T_co](BaseProperty[T_co]):
     @cached_property
     @override
     def title(self) -> str:
-        return f"mixed descriptor {Who.Addr(self)}".strip()
+        return f"mixed descriptor {who.Addr(self)}".strip()
 
     @override
     def header_with_context(self, node: Any) -> str:
@@ -142,7 +142,7 @@ class mixed_property[T_co](BaseProperty[T_co]):
         if node is None:
             msg = f"{self.header_with_context(node)}, node={node!r}"
             raise ContextFaultError(msg)
-        return get_owner(node, self.name) if Is.Class(node) else node
+        return get_owner(node, self.name) if isis.Class(node) else node
 
     @override
     def call(self, node: Any, *args: Any, **kw: Any) -> T_co:

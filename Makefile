@@ -9,27 +9,9 @@ install:
 
 lint:
 	@uv run --quiet \
-		black \
-		--quiet \
-		--line-length 79 \
-		--target-version py312 \
-	'src/' 'tests/' \
-	|| true
-
-	@uv run --quiet \
-		ruff check \
-			--quiet \
-			--fix \
-		'src/' 'tests/' \
-		|| true
-
-	@uv run --quiet \
-		yamlfix \
-			--config-file etc/lint/yamlfix.toml \
-			--exclude '.*/**/*.yml' \
-			--exclude '.*/**/*.yaml' \
-		. \
-		|| true
+	  pre-commit run \
+	--config etc/pre-commit.yaml \
+	--all
 
 check:
 	@uv run --quiet \
@@ -103,6 +85,12 @@ test:
 		-svvv \
 		--cov src \
 		--cov-report term-missing
+
+publish:
+	@rm -rf dist/ || true
+	@uv build
+	@uv run uv-publish --repo kain
+	@rm -rf dist/ || true
 
 %:
 	@just $@

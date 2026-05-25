@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, TypeVar, override
 
-from kain import Is
+from kain import isis
 from kain.properties.cached.klass import class_cached_property
 from kain.properties.cached.mixed import (
     mixed_cached_property,
@@ -40,7 +40,7 @@ class pre_parent_cached_property[T_co](
     @override
     def __set__(self, node: Any, value: Any) -> Any:
         self.get_node(node)
-        if not Is.Class(node):
+        if not isis.Class(node):
             return value
         return super().__set__(node, value)
 
@@ -57,7 +57,7 @@ class pre_cached_property[T_co](
     @override
     def __set__(self, node: Any, value: Any) -> Any:
         self.get_node(node)
-        if not Is.Class(node):
+        if not isis.Class(node):
             return value
         return super().__set__(node, value)
 

@@ -19,7 +19,7 @@ from functools import cached_property, partial
 from time import time
 from typing import TYPE_CHECKING, Any, TypeVar, cast, override
 
-from kain import Is, Who
+from kain import isis, who
 from kain.internals import get_owner
 from kain.properties.primitives import (
     AttributeExceptionError,
@@ -64,10 +64,10 @@ class CustomCallbackMixin:
     @classmethod
     def ttl(cls, expire: float) -> Callable[..., Any]:
         if not isinstance(expire, float | int):  # type: ignore[redundant-expr]
-            msg = f"expire must be float or int, not {Who.Cast(expire)}"
+            msg = f"expire must be float or int, not {who.Cast(expire)}"
             raise TypeError(msg)
         if expire <= 0:
-            msg = f"expire must be a positive number, not {Who.Cast(expire)}"
+            msg = f"expire must be a positive number, not {who.Cast(expire)}"
             raise ValueError(msg)
 
         def is_actual(_self: Any, _node: Any, value: Any = Nothing) -> Any:
@@ -105,10 +105,10 @@ class class_parent_cached_property[T_co](
         is_actual: Any = Nothing,
     ) -> None:
         super().__init__(function)
-        if method := getattr(Is.classOf(self), "is_actual", None):
+        if method := getattr(isis.classOf(self), "is_actual", None):
             if is_actual:
                 msg = (
-                    f"{Who.Is(self)}.is_actual method ({Who.Cast(method)}) "
+                    f"{who.Is(self)}.is_actual method ({who.Cast(method)}) "
                     "can't be overridden by the is_actual keyword argument"
                 )
                 raise TypeError(msg)
@@ -118,14 +118,14 @@ class class_parent_cached_property[T_co](
     @cached_property
     @override
     def title(self) -> str:
-        return f"class data-descriptor {Who.Addr(self)}".strip()
+        return f"class data-descriptor {who.Addr(self)}".strip()
 
     @override
     def header_with_context(self, node: Any) -> str:
         return self.footer(node)
 
     def get_node(self, node: Any) -> Any:
-        if node is None or not Is.Class(node):
+        if node is None or not isis.Class(node):
             msg = f"{self.header_with_context(node)}, node={node!r}"
             raise ContextFaultError(msg)
         result = get_owner(node, self.name)
@@ -208,7 +208,7 @@ class class_cached_property[T_co](
 
     @override
     def get_node(self, node: Any) -> Any:
-        if node is None or not Is.Class(node):
+        if node is None or not isis.Class(node):
             msg = f"{self.header_with_context(node)}, node={node!r}"
             raise ContextFaultError(msg)
         return node

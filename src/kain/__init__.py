@@ -1,7 +1,5 @@
-from kain import (
-    Is,
-    Who,
-)
+from kain import isis as Is  # noqa: N812
+from kain import who as Who  # noqa: N812
 from kain.classes import (
     Missing,
     Nothing,

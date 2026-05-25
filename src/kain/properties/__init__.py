@@ -93,9 +93,9 @@ class pin[T_co](bound_property[T_co]):  # noqa: N801
             )
 
         try:
-            return cache[self.name]
+            return cache[self.name]  # type: ignore[no-any-return, index]
 
         except KeyError:
             value = self.function(node)
-            cache[self.name] = value
-            return value
+            cache[self.name] = value  # type: ignore[index]
+            return value  # type: ignore[no-any-return]

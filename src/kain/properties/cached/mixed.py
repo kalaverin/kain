@@ -22,7 +22,7 @@ from contextlib import suppress
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, TypeVar, cast, override
 
-from kain import Is, Who
+from kain import isis, who
 from kain.internals import get_owner
 from kain.properties.cached.klass import (
     class_cached_property,
@@ -49,7 +49,7 @@ class mixed_parent_cached_property[T_co](
     @cached_property
     @override
     def title(self) -> str:
-        return f"mixed data-descriptor {Who.Addr(self)}".strip()
+        return f"mixed data-descriptor {who.Addr(self)}".strip()
 
     @override
     def header_with_context(self, node: Any) -> str:
@@ -61,12 +61,12 @@ class mixed_parent_cached_property[T_co](
             msg = f"{self.header_with_context(node)}, node={node!r}"
             raise ContextFaultError(msg)
         result = get_owner(node, self.name)
-        return result if result is not None and Is.Class(node) else node
+        return result if result is not None and isis.Class(node) else node
 
     @override
     def get_cache(self, node: Any) -> dict[str, Any]:
         self.get_node(node)
-        name = f"__{('instance', 'class')[Is.Class(node)]}_memoized__"
+        name = f"__{('instance', 'class')[isis.Class(node)]}_memoized__"
         if hasattr(node, "__dict__"):
             with suppress(KeyError):
                 return cast("dict[str, Any]", node.__dict__[name])
