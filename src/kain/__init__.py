@@ -1,3 +1,4 @@
+from kain import isis, who
 from kain import isis as Is  # noqa: N812
 from kain import who as Who  # noqa: N812
 from kain.classes import (
@@ -35,6 +36,7 @@ __all__ = (
     "Who",
     "add_path",
     "class_property",
+    "isis",
     "mixed_property",
     "on_quit",
     "optional",
@@ -44,4 +46,5 @@ __all__ = (
     "to_ascii",
     "to_bytes",
     "unique",
+    "who",
 )
