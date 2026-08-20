@@ -25,17 +25,30 @@ from kain.signals import (
 @pytest.fixture(autouse=True)
 def _isolate_on_quit() -> None:
     """Restore global state and reset the on_quit singleton after each test."""
-    # Ensure a clean baseline before each test
-    sys.excepthook = sys.__excepthook__
+    # Save the original state so we can restore it after the test.
     original_excepthook = sys.excepthook
     original_threading_hook = threading.excepthook
+    original_sigint = signal.getsignal(signal.SIGINT)
+    original_sigterm = signal.getsignal(signal.SIGTERM)
+    original_sigquit = (
+        signal.getsignal(signal.SIGQUIT)
+        if hasattr(signal, "SIGQUIT")
+        else None
+    )
 
-    # Reset singleton state so the next test gets a fresh instance
+    # Ensure a clean baseline before each test.
+    sys.excepthook = sys.__excepthook__
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)
+    if hasattr(signal, "SIGQUIT"):
+        signal.signal(signal.SIGQUIT, signal.SIG_DFL)
+
+    # Reset singleton state so the next test gets a fresh instance.
     on_quit.instance = Nothing  # type: ignore[assignment][attr-defined]
 
     yield
 
-    # Tear down any created instance and restore hooks
+    # Tear down any created instance and restore hooks.
     inst = on_quit.instance
     if inst is not Nothing and hasattr(inst, "restore_original_handlers"):
         inst.restore_original_handlers()
@@ -43,6 +56,10 @@ def _isolate_on_quit() -> None:
     on_quit.instance = Nothing  # type: ignore[assignment][attr-defined]
     sys.excepthook = original_excepthook
     threading.excepthook = original_threading_hook
+    signal.signal(signal.SIGINT, original_sigint)
+    signal.signal(signal.SIGTERM, original_sigterm)
+    if hasattr(signal, "SIGQUIT") and original_sigquit is not None:
+        signal.signal(signal.SIGQUIT, original_sigquit)
 
 
 def _fresh_instance() -> Any:
@@ -129,6 +146,7 @@ class TestOnSystemExit:
 
     def test_restore_original_handlers_resets_sigquit(self) -> None:
         inst = _fresh_instance()
+        inst.install()
         with patch("kain.signals.bind") as mock_bind:
             inst.restore_original_handlers()
         calls = [c[0][0] for c in mock_bind.call_args_list]
@@ -176,15 +194,92 @@ class TestOnSystemExit:
     def test_inject_hook_replaces_excepthook(self) -> None:
         original = sys.excepthook
         inst = _fresh_instance()
+        inst.install()
         assert sys.excepthook is inst._proxy
         sys.excepthook = original
 
     def test_teardown_restores_handlers(self) -> None:
         original_excepthook = sys.excepthook
         inst = _fresh_instance()
+        inst.install()
         inst.teardown()
         assert sys.excepthook is original_excepthook
         assert threading.excepthook is threading.__excepthook__
+
+    def test_on_quit_init_does_not_install(self) -> None:
+        """Construction must not touch global hooks, handlers, or atexit."""
+        with (
+            patch("kain.signals.atexit.register") as mock_atexit,
+            patch("kain.signals.bind") as mock_bind,
+        ):
+            _fresh_instance()
+        mock_atexit.assert_not_called()
+        mock_bind.assert_not_called()
+
+    def test_install_registers_hooks_and_handlers(self) -> None:
+        """install() registers excepthook, threading hook, signals, atexit."""
+        inst = _fresh_instance()
+        with (
+            patch("kain.signals.atexit.register") as mock_atexit,
+            patch("kain.signals.bind") as mock_bind,
+        ):
+            inst.install()
+        mock_atexit.assert_not_called()
+        sigs = {c.args[0] for c in mock_bind.call_args_list}
+        assert signal.SIGINT in sigs
+        assert signal.SIGTERM in sigs
+        assert sys.excepthook is inst._proxy
+        assert getattr(threading.excepthook, "__func__", None) is (
+            inst.threading_handler.__func__
+        )
+
+    def test_install_is_idempotent(self) -> None:
+        """Repeated install() calls must not register hooks again."""
+        inst = _fresh_instance()
+        with patch("kain.signals.bind") as mock_bind:
+            inst.install()
+            inst.install()
+        # SIGINT, SIGTERM, SIGQUIT = 3 calls total.
+        assert mock_bind.call_count == 3
+
+    def test_schedule_triggers_install_and_atexit(self) -> None:
+        """schedule() lazily installs hooks and registers atexit once."""
+        inst = _fresh_instance()
+        with (
+            patch.object(inst, "install", wraps=inst.install) as mock_install,
+            patch.object(
+                inst,
+                "_ensure_atexit",
+                wraps=inst._ensure_atexit,
+            ) as mock_atexit,
+        ):
+            inst.schedule(lambda: None)
+            inst.schedule(lambda: None)
+        # install() and _ensure_atexit() are invoked from each schedule()
+        # but both are idempotent.
+        assert mock_install.call_count == 2
+        assert mock_atexit.call_count == 2
+        assert len(inst.callbacks) == 2
+
+    def test_restore_original_handlers_restores_signal_handlers(self) -> None:
+        """restore_original_handlers() restores saved signal handlers."""
+        inst = _fresh_instance()
+        custom_sigint = lambda _signum, _frame: None  # noqa: E731
+        custom_sigterm = lambda _signum, _frame: None  # noqa: E731
+        signal.signal(signal.SIGINT, custom_sigint)
+        signal.signal(signal.SIGTERM, custom_sigterm)
+        try:
+            inst.install()
+            inst.restore_original_handlers()
+            assert (
+                signal.signal(signal.SIGINT, signal.SIG_DFL) is custom_sigint
+            )
+            assert (
+                signal.signal(signal.SIGTERM, signal.SIG_DFL) is custom_sigterm
+            )
+        finally:
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
 
 
 class TestQuitAt:
@@ -451,6 +546,7 @@ class TestOnQuitHooksExtended:
         self,
     ) -> None:
         inst = _fresh_instance()
+        inst.install()
         other_hook = MagicMock()
         sys.excepthook = other_hook
         inst.exceptions_hooks_proxy(RuntimeError, RuntimeError("x"), None)
@@ -605,12 +701,17 @@ class TestOnQuitSignalExtended:
         "sig",
         (signal.SIGINT, signal.SIGTERM, signal.SIGQUIT),
     )
-    def test_restore_original_handlers_resets_signal(self, sig: int) -> None:
+    def test_restore_original_handlers_restores_signal(self, sig: int) -> None:
         inst = _fresh_instance()
-        with patch("kain.signals.bind") as mock_bind:
-            inst.restore_original_handlers()
-        calls = {c[0][0]: c[0][1] for c in mock_bind.call_args_list}
-        assert calls[sig] is signal.SIG_DFL
+        original = signal.signal(sig, signal.SIG_DFL)
+        try:
+            inst.install()
+            with patch("kain.signals.bind") as mock_bind:
+                inst.restore_original_handlers()
+            calls = {c[0][0]: c[0][1] for c in mock_bind.call_args_list}
+            assert calls[sig] is original
+        finally:
+            signal.signal(sig, original)
 
     def test_restore_original_handlers_does_not_touch_sighup(self) -> None:
         if not hasattr(signal, "SIGHUP"):

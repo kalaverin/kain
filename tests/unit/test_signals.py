@@ -11,7 +11,8 @@ import threading
 from collections.abc import Generator
 from pathlib import Path
 from types import TracebackType
-from typing import get_type_hints
+from typing import Any, get_type_hints
+from unittest.mock import patch
 
 import pytest
 from faker import Faker
@@ -24,6 +25,14 @@ from kain.signals import get_mtime, get_selfpath, on_quit, quit_at
 @pytest.fixture(autouse=True)
 def _reset_on_quit_state() -> Generator[None, None, None]:
     """Restore hooks and reset singleton state after each test."""
+    original_sigint = signal.getsignal(signal.SIGINT)
+    original_sigterm = signal.getsignal(signal.SIGTERM)
+    original_sigquit = (
+        signal.getsignal(signal.SIGQUIT)
+        if hasattr(signal, "SIGQUIT")
+        else None
+    )
+
     yield
     if on_quit.instance is not Nothing:
         on_quit.instance.restore_original_handlers()
@@ -36,6 +45,10 @@ def _reset_on_quit_state() -> Generator[None, None, None]:
     # Clear quit_at caches so each test gets a fresh snapshot.
     quit_at.cache_clear()
     get_selfpath.cache_clear()
+    signal.signal(signal.SIGINT, original_sigint)
+    signal.signal(signal.SIGTERM, original_sigterm)
+    if hasattr(signal, "SIGQUIT") and original_sigquit is not None:
+        signal.signal(signal.SIGQUIT, original_sigquit)
 
 
 # ------------------------------------------------------------------
@@ -105,29 +118,40 @@ class TestOnQuit:
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """GIVEN hooks have been replaced
+        """GIVEN hooks have been replaced by install()
         WHEN restore_original_handlers() is called
         THEN sys.excepthook, threading.excepthook, and signal handlers
-        revert to their defaults.
+        revert to the values captured before install().
         """
-        original_sigint = signal.signal(signal.SIGINT, signal.SIG_DFL)
-        original_sigterm = signal.signal(signal.SIGTERM, signal.SIG_DFL)
-        original_sigquit = signal.signal(signal.SIGQUIT, signal.SIG_DFL)
+
+        def custom_sigint(_signum: int, _frame: Any) -> None:
+            pass
+
+        def custom_sigterm(_signum: int, _frame: Any) -> None:
+            pass
+
+        def custom_sigquit(_signum: int, _frame: Any) -> None:
+            pass
+
+        original_sigint = signal.signal(signal.SIGINT, custom_sigint)
+        original_sigterm = signal.signal(signal.SIGTERM, custom_sigterm)
+        original_sigquit = signal.signal(signal.SIGQUIT, custom_sigquit)
 
         try:
             obj = on_quit()
+            obj.install()
             obj.restore_original_handlers()
 
             assert sys.excepthook is obj.original_hook
             assert threading.excepthook is threading.__excepthook__
             assert (
-                signal.signal(signal.SIGINT, signal.SIG_DFL) is signal.SIG_DFL
+                signal.signal(signal.SIGINT, signal.SIG_DFL) is custom_sigint
             )
             assert (
-                signal.signal(signal.SIGTERM, signal.SIG_DFL) is signal.SIG_DFL
+                signal.signal(signal.SIGTERM, signal.SIG_DFL) is custom_sigterm
             )
             assert (
-                signal.signal(signal.SIGQUIT, signal.SIG_DFL) is signal.SIG_DFL
+                signal.signal(signal.SIGQUIT, signal.SIG_DFL) is custom_sigquit
             )
         finally:
             # Ensure cleanup regardless of assertion outcomes.
@@ -135,17 +159,58 @@ class TestOnQuit:
             signal.signal(signal.SIGTERM, original_sigterm)
             signal.signal(signal.SIGQUIT, original_sigquit)
 
-    def test_on_quit_injects_hooks_on_init(
+    def test_on_quit_install_injects_hooks(
         self,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """GIVEN a fresh process state
-        AFTER on_quit() is instantiated
+        AFTER install() is called
         THEN sys.excepthook is replaced with the proxy.
         """
         obj = on_quit()
+        obj.install()
 
         assert sys.excepthook is obj._proxy
+
+    def test_on_quit_init_does_not_install(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """GIVEN on_quit() is instantiated
+        WHEN no active method is called
+        THEN global hooks and atexit remain untouched.
+        """
+        with (
+            patch("kain.signals.atexit.register") as mock_atexit,
+            patch("kain.signals.bind") as mock_bind,
+        ):
+            on_quit()
+
+        mock_atexit.assert_not_called()
+        mock_bind.assert_not_called()
+
+    def test_on_quit_schedule_triggers_install(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """GIVEN a fresh on_quit instance
+        WHEN schedule() is called
+        THEN install() runs lazily and atexit is registered.
+        """
+        obj = on_quit()
+        with (
+            patch.object(obj, "install", wraps=obj.install) as mock_install,
+            patch.object(
+                obj,
+                "_ensure_atexit",
+                wraps=obj._ensure_atexit,
+            ) as mock_atexit,
+        ):
+            obj.schedule(lambda: None)
+
+        mock_install.assert_called_once()
+        mock_atexit.assert_called_once()
+        assert len(obj.callbacks) == 1
 
     def test_on_quit_add_hook_appends_to_chain(self) -> None:
         """GIVEN a custom exception hook
