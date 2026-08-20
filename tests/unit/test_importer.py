@@ -154,17 +154,15 @@ def test_import_object_imports_attribute() -> None:
 
 
 @pytest.mark.unit
-def test_import_object_with_parent_object() -> None:
+def test_import_object_rejects_second_argument() -> None:
     """
-    Given: a parent object and an attribute path
-    When: calling import_object with both args
-    Then: returns the resolved attribute
+    Given: a second positional argument
+    When: calling import_object
+    Then: raises TypeError
     """
-    # --- Act ---
-    result = import_object("join", os.path)
-
-    # --- Assert ---
-    assert result is os.path.join
+    # --- Act / Assert ---
+    with pytest.raises(TypeError):
+        import_object("join", os.path)
 
 
 @pytest.mark.unit
@@ -182,39 +180,39 @@ def test_import_object_with_bytes_path() -> None:
 
 
 @pytest.mark.unit
-def test_import_object_raises_type_error_when_both_none() -> None:
+def test_import_object_raises_type_error_for_none_path() -> None:
     """
-    Given: both arguments are None
-    When: calling import_object
-    Then: raises TypeError
-    """
-    # --- Act / Assert ---
-    with pytest.raises(TypeError, match="all arguments are None"):
-        import_object(None, None)
-
-
-@pytest.mark.unit
-def test_import_object_raises_type_error_path_not_str_something_none() -> None:
-    """
-    Given: a non-string path and None second argument
+    Given: path is None
     When: calling import_object
     Then: raises TypeError
     """
     # --- Act / Assert ---
     with pytest.raises(TypeError, match="isn't str"):
-        import_object(123, None)
+        import_object(None)
+
+
+@pytest.mark.unit
+def test_import_object_raises_type_error_for_non_string_path() -> None:
+    """
+    Given: a non-string path
+    When: calling import_object
+    Then: raises TypeError
+    """
+    # --- Act / Assert ---
+    with pytest.raises(TypeError, match="isn't str"):
+        import_object(123)
 
 
 @pytest.mark.unit
 def test_import_object_type_error_contains_who_is_info() -> None:
     """
-    Given: a non-string path and None second argument
+    Given: a non-string path
     When: calling import_object
     Then: the TypeError message includes Who.Is(path) type info.
     """
     # --- Act / Assert ---
     with pytest.raises(TypeError, match="int"):
-        import_object(123, None)
+        import_object(123)
 
 
 @pytest.mark.unit

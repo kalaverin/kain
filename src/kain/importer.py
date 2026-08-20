@@ -26,7 +26,6 @@ from logging import getLogger
 from os import sep
 from pathlib import Path
 from types import ModuleType
-from typing import overload
 
 from kain import who
 from kain.internals import iter_stack, to_ascii, unique
@@ -145,92 +144,52 @@ def get_child(path: str, parent: object, child: str) -> object:
     return getattr(parent, child)
 
 
-@overload
-def import_object(path: str | bytes, something: None = None) -> object: ...
-
-
-@overload
-def import_object(path: str | bytes, something: object) -> object: ...
-
-
-def import_object(
-    path: str | bytes | None,
-    something: object = None,
-) -> object:
+def import_object(path: str | bytes) -> object:
     """Dynamically import an object by its fully-qualified name.
 
     Supports importing:
     - Entire modules (``os``, ``kain.importer``)
     - Module attributes (``os.path.join``, ``kain.importer.required``)
-    - Attributes from given parent objects
 
     Args:
-        path: Can be a string or bytes. If ``something`` is provided and
-            ``path`` is not a string, the arguments are swapped so that
-            ``something`` is treated as the import path.
-        something: Optional parent object or import path string. If
-            ``path`` is a string, this is treated as the parent object. If
-            ``path`` is not a string, this is treated as the import path
-            string and the arguments are swapped.
+        path: A dotted import path as string or bytes.
 
     Returns:
         The imported object (module, class, function, etc.).
 
     Raises:
-        TypeError: If both arguments are None, or if path is not a string
-            and something is None.
+        TypeError: If ``path`` is not a string or bytes.
         ImportError: If the module or attribute cannot be found.
 
     Example:
         >>> import_object("os.path.join")
         <function join at ...>
-        >>> import_object("path.join", os)
-        <function join at ...>
     """
-    if path is something is None:
-        raise TypeError("all arguments are None")
+    if not isinstance(path, str | bytes):
+        raise TypeError(f"{who.Is(path)} isn't str")
 
-    if isinstance(path, str | bytes):
-        path = to_ascii(path)
-
-    if not isinstance(path, str):
-        if something is None:
-            msg = (
-                f"{who.Is(path)} isn't str, but "
-                f"second argument (import path) is None"
-            )
-            raise TypeError(msg)
-        path, something = something, path  # type: ignore[assignment]  # pyrefly: ignore[bad-assignment]  # pyright: ignore[reportAssignmentType]
-
+    path = to_ascii(path)
     logger.debug(f"lookup: {path}")
 
-    if something:
-        locator = f"{who.Is(something)}.{path}"
-        sequence = path.split(".")  # type: ignore[union-attr]  # pyrefly: ignore[missing-attribute]  # pyright: ignore[reportOptionalMemberAccess, reportArgumentType]
+    something, sequence = get_module(path)
+    if something is None:  # type: ignore[redundant-expr]  # pyright: ignore[reportUnnecessaryComparison]
+        raise ImportError(f"{path} (isn't exists?)")
 
-    else:
-        locator = str(path)
-        if path is None:
-            raise TypeError("path is required")
-        something, sequence = get_module(path)
-
-        if something is None:  # type: ignore[redundant-expr]  # pyright: ignore[reportUnnecessaryComparison]
-            raise ImportError(f"{path} (isn't exists?)")
-
+    locator = str(path)
     if not sequence:
         logger.debug(f"import path: {who.Is(something)}")
 
     else:
         logger.debug(
             f"split path: {who.Is(something)} (module) "
-            f'-> {".".join(sequence)} (path)',  # pyright: ignore[reportCallIssue, reportArgumentType]
+            f'-> {".".join(sequence)} (path)',
         )
 
     for name in sequence:
         something = get_child(
             locator,
             something,
-            name,  # pyright: ignore[reportArgumentType]
+            name,
         )
 
     logger.debug("load ok: %s", path)
@@ -238,15 +197,14 @@ def import_object(
 
 
 @cache
-def cached_import(*args: object, **kw: object) -> object:
+def cached_import(path: str | bytes) -> object:
     """Cached version of ``import_object``.
 
     Uses :func:`functools.cache` to memoize import results. Subsequent
-    calls with the same arguments return the cached result.
+    calls with the same path return the cached result.
 
     Args:
-        *args: Positional arguments passed to ``import_object``.
-        **kw: Keyword arguments passed to ``import_object``.
+        path: The import path passed to ``import_object``.
 
     Returns:
         The imported (and cached) object.
@@ -254,10 +212,16 @@ def cached_import(*args: object, **kw: object) -> object:
     Example:
         >>> cached_import("os.path.join")
     """
-    return import_object(*args, **kw)  # type: ignore[call-overload]  # pyrefly: ignore[no-matching-overload]  # pyright: ignore[reportCallIssue, reportArgumentType]
+    return import_object(path)
 
 
-def required(path: str, *args: object, **kw: object) -> object:
+def required(
+    path: str,
+    *,
+    throw: bool = True,
+    quiet: bool = False,
+    default: object = None,
+) -> object:
     """Import an object, requiring it to exist.
 
     Attempts to import the object at ``path``. If the import fails,
@@ -266,15 +230,11 @@ def required(path: str, *args: object, **kw: object) -> object:
 
     Args:
         path: The import path (e.g., ``os.path.join``).
-        *args: Additional positional arguments passed to ``cached_import`` /
-            ``import_object``.
         throw: If True (default), raise ImportError on failure.
             If False, return ``default`` on failure.
         quiet: If True, suppress warning log on failure.
             If False (default), log a warning on failure.
         default: Value to return on failure when ``throw=False``.
-        **kw: Additional keyword arguments passed to ``cached_import`` /
-            ``import_object``.
 
     Returns:
         The imported object, or ``default`` if import failed and
@@ -289,21 +249,17 @@ def required(path: str, *args: object, **kw: object) -> object:
         >>> required("nonexistent", throw=False, default="fallback")
         'fallback'
     """
-    throw = kw.pop("throw", True)
-    quiet = kw.pop("quiet", False)
-    default: object = kw.pop("default", None)
-
     try:
         try:
-            return cached_import(path, *args, **kw)
+            return cached_import(path)
 
         except TypeError:
-            return import_object(path, *args, **kw)
+            return import_object(path)
 
     except ImportError as e:
 
         if not quiet or throw:
-            msg = f"couldn't import required({path=}, *{args=}, **{kw=})"
+            msg = f"couldn't import required({path=})"
 
             base = path.split(".", 1)[0]
             if base not in sys.modules:
@@ -319,7 +275,13 @@ def required(path: str, *args: object, **kw: object) -> object:
     return default
 
 
-def optional(path: str, *args: object, **kw: object) -> object:
+def optional(
+    path: str,
+    *,
+    default: object = None,
+    throw: bool = False,
+    quiet: bool = True,
+) -> object:
     """Import an object optionally, returning None on failure.
 
     Convenience wrapper around ``required`` with ``quiet=True``
@@ -327,17 +289,18 @@ def optional(path: str, *args: object, **kw: object) -> object:
 
     Args:
         path: The import path.
-        *args: Additional positional arguments passed to ``required``.
         default: Value to return on failure.
-        **kw: Additional keyword arguments passed to ``required``.
-            Defaults: ``quiet=True``, ``throw=False``.
+        throw: If True, raise ImportError on failure.
+            Defaults to False.
+        quiet: If True, suppress warning log on failure.
+            Defaults to True.
 
     Returns:
         The imported object, or ``default`` if specified and import failed,
         or None if import failed and no default specified.
 
     Raises:
-        ImportError: If import fails and ``throw=True`` is passed in **kw.
+        ImportError: If import fails and ``throw=True``.
 
     Example:
         >>> optional("natsort.natsorted", default=sorted)
@@ -345,9 +308,7 @@ def optional(path: str, *args: object, **kw: object) -> object:
         >>> optional("nonexistent_module")
         None
     """
-    kw.setdefault("quiet", True)
-    kw.setdefault("throw", False)
-    return required(path, *args, **kw)
+    return required(path, throw=throw, quiet=quiet, default=default)
 
 
 def get_path(  # noqa: PLR0912

@@ -208,23 +208,21 @@ class TestImportObject:
 
         assert result is os.path.join
 
-    def test_import_with_two_arguments(self) -> None:
-        """Should accept path and object as separate arguments."""
+    def test_rejects_two_arguments(self) -> None:
+        """Should reject a second positional argument."""
         import os
 
-        result = import_object("path.join", os)
-        import os.path
-
-        assert result is os.path.join
+        with pytest.raises(TypeError):
+            import_object("path.join", os)
 
     def test_import_class_from_module(self) -> None:
         """Should import class from module."""
         result = import_object("kain.importer.required")
         assert result is required
 
-    def test_both_arguments_none_raises(self) -> None:
-        """Should raise TypeError when both arguments are None."""
-        with pytest.raises(TypeError, match="all arguments are None"):
+    def test_none_path_raises(self) -> None:
+        """Should raise TypeError when path is None."""
+        with pytest.raises(TypeError, match="isn't str"):
             import_object(None)
 
     def test_bytes_path(self) -> None:
@@ -232,20 +230,17 @@ class TestImportObject:
         result = import_object(b"os")
         assert result is sys.modules["os"]
 
-    def test_non_string_path_with_none_something(self) -> None:
-        """Should raise TypeError for non-string path without second arg."""
-        with pytest.raises(TypeError) as exc_info:
+    def test_non_string_path_raises(self) -> None:
+        """Should raise TypeError for non-string path."""
+        with pytest.raises(TypeError, match="isn't str"):
             import_object(123)
-        assert "isn't str" in str(exc_info.value)
 
-    def test_swapped_arguments(self) -> None:
-        """Should swap arguments when first is not string."""
+    def test_swapped_arguments_rejected(self) -> None:
+        """Should reject swapped arguments."""
         import os
 
-        result = import_object(os, "path.join")
-        import os.path
-
-        assert result is os.path.join
+        with pytest.raises(TypeError):
+            import_object(os, "path.join")
 
     def test_nonexistent_module_raises(self) -> None:
         """Should raise ImportError for non-existent module."""
@@ -743,12 +738,9 @@ class TestRequiredExtended:
             required("unknown_package_name")
         assert "unknown-package-name" in str(exc_info.value)
 
-    def test_required_passes_extra_kwargs_to_cached_import(self) -> None:
-        with patch("kain.importer.cached_import") as mock_cached:
-            mock_cached.return_value = "ok"
-            result = required("os", some_kw=True)
-            mock_cached.assert_called_once_with("os", some_kw=True)
-            assert result == "ok"
+    def test_required_rejects_extra_kwargs(self) -> None:
+        with pytest.raises(TypeError):
+            required("os", some_kw=True)
 
     def test_required_with_bytes_path(self) -> None:
         result = required(b"os")
@@ -827,16 +819,13 @@ class TestOptionalExtended:
             optional("x", throw=True)
             assert mock_req.call_args[1]["throw"] is True
 
-    def test_optional_passes_args(self) -> None:
-        with patch("kain.importer.required") as mock_req:
+    def test_optional_rejects_extra_args(self) -> None:
+        with pytest.raises(TypeError):
             optional("x", "arg1", default=1)
-            assert mock_req.call_args[0] == ("x", "arg1")
 
-    def test_optional_passes_kwargs(self) -> None:
-        with patch("kain.importer.required") as mock_req:
+    def test_optional_rejects_extra_kwargs(self) -> None:
+        with pytest.raises(TypeError):
             optional("x", default=1, some_kw=True)
-            assert mock_req.call_args[1]["default"] == 1
-            assert mock_req.call_args[1]["some_kw"] is True
 
 
 class TestAddPathExtended:
@@ -1064,27 +1053,28 @@ class TestImportObjectExtended:
 
         assert import_object("os.path.dirname") is os.path.dirname
 
-    def test_import_object_with_parent_and_empty_sequence(self) -> None:
+    def test_import_object_with_second_argument_rejected(self) -> None:
         import os
 
-        with pytest.raises(ImportError, match="hasn't member"):
+        with pytest.raises(TypeError):
             import_object("", os)
 
     def test_import_object_bytes_path(self) -> None:
         assert import_object(b"os") is sys.modules["os"]
 
-    def test_import_object_both_none(self) -> None:
-        with pytest.raises(TypeError, match="all arguments are None"):
+    def test_import_object_none_path(self) -> None:
+        with pytest.raises(TypeError, match="isn't str"):
             import_object(None)
 
-    def test_import_object_non_string_path_no_parent(self) -> None:
+    def test_import_object_non_string_path(self) -> None:
         with pytest.raises(TypeError, match="isn't str"):
             import_object(123)
 
-    def test_import_object_swapped_arguments(self) -> None:
+    def test_import_object_swapped_arguments_rejected(self) -> None:
         import os
 
-        assert import_object(os, "path.join") is os.path.join
+        with pytest.raises(TypeError):
+            import_object(os, "path.join")
 
     def test_import_object_nonexistent_module(self) -> None:
         with pytest.raises(ImportError):
@@ -1098,10 +1088,11 @@ class TestImportObjectExtended:
         with pytest.raises(ImportError):
             import_object("bad.path.that.doesnt.exist")
 
-    def test_import_object_with_bytes_and_parent(self) -> None:
+    def test_import_object_with_bytes_and_second_arg_rejected(self) -> None:
         import os
 
-        assert import_object(b"path.join", os) is os.path.join
+        with pytest.raises(TypeError):
+            import_object(b"path.join", os)
 
 
 class TestCachedImportExtended:
@@ -1117,19 +1108,19 @@ class TestCachedImportExtended:
     def test_cached_import_matches_import_object(self) -> None:
         assert cached_import("os.path.join") is import_object("os.path.join")
 
-    def test_cached_import_with_extra_args(self) -> None:
+    def test_cached_import_rejects_extra_args(self) -> None:
         cached_import.cache_clear()
         import os
 
-        r = cached_import("path.join", os)
-        assert r is os.path.join
+        with pytest.raises(TypeError):
+            cached_import("path.join", os)
 
-    def test_cached_import_with_kwargs(self) -> None:
+    def test_cached_import_rejects_kwargs(self) -> None:
         cached_import.cache_clear()
         import os
 
-        r = cached_import("path.join", something=os)
-        assert r is os.path.join
+        with pytest.raises(TypeError):
+            cached_import("path.join", something=os)
 
     def test_cached_import_clear_and_info(self) -> None:
         cached_import.cache_clear()
