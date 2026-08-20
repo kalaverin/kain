@@ -14,7 +14,7 @@ from logging import getLogger
 from operator import attrgetter
 from typing import Any, TypeVar, cast
 
-from kain import isis, who
+from kain import _is, _who
 from kain.classes import Nothing
 from kain.internals import get_attr
 from kain.properties.primitives import bound_property
@@ -63,8 +63,8 @@ def proxy_to(  # noqa: PLR0915
         )
 
     def class_wrapper(cls: type[T]) -> type[T]:  # noqa: PLR0915
-        if not isis.Class(cls):
-            msg = f"{who.Is(cls)} isn't a class"
+        if not _is.Class(cls):
+            msg = f"{_who.Is(cls)} isn't a class"
             raise TypeError(msg)
         try:
             fields: list[str] = cls.__proxy_fields__  # type: ignore[attr-defined]  # pyrefly: ignore[missing-attribute]  # pyright: ignore[reportAttributeAccessIssue]
@@ -82,7 +82,7 @@ def proxy_to(  # noqa: PLR0915
             method = cast("str", raw_method)
             if safe and (not method.startswith("_")) and get_attr(cls, method):
                 msg = (
-                    f"{who.Is(cls)} already exists {method!a}: "
+                    f"{_who.Is(cls)} already exists {method!a}: "
                     f"{get_attr(cls, method)}"
                 )
                 raise TypeError(msg)
@@ -96,9 +96,9 @@ def proxy_to(  # noqa: PLR0915
                         return getattr(pivot, name)
                     except AttributeError as e:
                         msg = (
-                            f"{who.Is(node)}.{name} "
-                            f"{who.Name(getter)[:4]}-proxied -> "
-                            f"{who.Is(pivot)}.{name}, "
+                            f"{_who.Is(node)}.{name} "
+                            f"{_who.Name(getter)[:4]}-proxied -> "
+                            f"{_who.Is(pivot)}.{name}, "
                             f"but the latter does not exist"
                         )
                         raise AttributeError(msg) from e
@@ -106,22 +106,22 @@ def proxy_to(  # noqa: PLR0915
                     entity = getattr(node, pivot)
                 except AttributeError as e:
                     msg = (
-                        f"{who.Is(node)}.{name} "
-                        f"{who.Name(getter)[:4]}-proxied -> "
-                        f"{who.Is(node)}.{pivot}.{name}, "
-                        f"but {who.Is(node)}.{pivot} does not exist"
+                        f"{_who.Is(node)}.{name} "
+                        f"{_who.Name(getter)[:4]}-proxied -> "
+                        f"{_who.Is(node)}.{pivot}.{name}, "
+                        f"but {_who.Is(node)}.{pivot} does not exist"
                     )
                     raise AttributeError(msg) from e
                 if entity is None:
                     msg = (
-                        f"{who.Is(node)}.{name} "
-                        f"{who.Name(getter)[:4]}-proxied -> "
-                        f"{who.Is(node)}.{pivot}.{name}, "
-                        f"but current {who.Is(node)}.{pivot} is None"
+                        f"{_who.Is(node)}.{name} "
+                        f"{_who.Name(getter)[:4]}-proxied -> "
+                        f"{_who.Is(node)}.{pivot}.{name}, "
+                        f"but current {_who.Is(node)}.{pivot} is None"
                     )
                     if default is Nothing:
                         raise AttributeError(msg)
-                    msg = f"{msg}; return {who.Is(default)}"
+                    msg = f"{msg}; return {_who.Is(default)}"
                     logger.warning(msg)
                     result = default
                 else:
@@ -129,15 +129,15 @@ def proxy_to(  # noqa: PLR0915
                         result = getter(name)(entity)
                     except (AttributeError, KeyError) as e:
                         msg = (
-                            f"{who.Is(node)}.{name} "
-                            f"{who.Name(getter)[:4]}-proxied -> "
-                            f"{who.Is(node)}.{pivot}.{name}, "
+                            f"{_who.Is(node)}.{name} "
+                            f"{_who.Name(getter)[:4]}-proxied -> "
+                            f"{_who.Is(node)}.{pivot}.{name}, "
                             f"but it does not exist ('{name}' not in "
-                            f"{who.Is(node)}.{pivot}): {who.Is(entity)}"
+                            f"{_who.Is(node)}.{pivot}): {_who.Is(entity)}"
                         )
                         if default is Nothing:
-                            raise isis.classOf(e)(msg) from e
-                        msg = f"{msg}; return {who.Is(default)}"
+                            raise _is.classOf(e)(msg) from e
+                        msg = f"{msg}; return {_who.Is(default)}"
                         logger.warning(msg)
                         result = default
                 return partial(pre, result) if pre else result

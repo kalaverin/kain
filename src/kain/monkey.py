@@ -28,7 +28,7 @@ from logging import getLogger
 from types import ModuleType
 from typing import Any, ClassVar, cast
 
-from kain import isis, who
+from kain import _is, _who
 from kain.importer import required
 
 logger = getLogger(__name__)
@@ -114,7 +114,7 @@ class Monkey:
         if isinstance(module, tuple):
             node, name = module
 
-        elif isis.module(module):
+        elif _is.module(module):
             node, name = module, cast("str", getattr(new, "__name__", ""))
 
         else:
@@ -129,7 +129,7 @@ class Monkey:
             return new
 
         old = (
-            required(cast("str", node), name) if who.Is(node) != name else node
+            required(cast("str", node), name) if _who.Is(node) != name else node
         )
 
         setattr(node, name, new)
@@ -138,7 +138,7 @@ class Monkey:
             raise RuntimeError
 
         cls.mapping[new] = old
-        logger.debug(f"{who.Addr(old)} -> {who.Addr(new)}")
+        logger.debug(f"{_who.Addr(old)} -> {_who.Addr(new)}")
         return new
 
     @classmethod
@@ -176,7 +176,7 @@ class Monkey:
 
             local = name or cast("str", getattr(func, "__name__", ""))
             setattr(node, local, wrapper)
-            logger.info(f"{who.Is(node)}.{local} <- {who.Addr(func)}")
+            logger.info(f"{_who.Is(node)}.{local} <- {_who.Addr(func)}")
             return wrapper
 
         return bind
@@ -211,7 +211,7 @@ class Monkey:
 
         def wrap(func: Callable[..., object]) -> Callable[..., object]:
             wrapped_name = name or cast("str", getattr(func, "__name__", ""))
-            if who.Name(node) != wrapped_name:
+            if _who.Name(node) != wrapped_name:
                 wrapped_func = required(cast("str", node), wrapped_name)
             else:
                 wrapped_func = node
@@ -220,7 +220,7 @@ class Monkey:
             def wrapper(*args: object, **kw: object) -> object:
                 return func(wrapped_func, *args, **kw)
 
-            logger.info(f"{who.Is(node)}.{wrapped_name} <- {who.Addr(func)}")
+            logger.info(f"{_who.Is(node)}.{wrapped_name} <- {_who.Addr(func)}")
 
             wrapped = decorator(wrapper) if decorator else wrapper
             _ = cls.patch((node, wrapped_name), wrapped)

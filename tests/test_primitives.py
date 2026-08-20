@@ -15,7 +15,6 @@ from kain.properties.primitives import (
     ReadOnlyError,
     bound_property,
     extract_wrapped,
-    invocation_context_check,
     parent_call,
 )
 
@@ -587,68 +586,3 @@ class TestBoundProperty:
 
         assert Foo().my_prop
         assert Foo.__dict__["my_prop"].name == "my_prop"
-
-
-class TestInvocationContextCheck:
-    """Granular tests for the invocation_context_check decorator."""
-
-    def _make_descriptor(self, klass: bool | None) -> object:
-        class Descriptor:
-            def __init__(self) -> None:
-                self.klass = klass
-
-            def header_with_context(self, node: object) -> str:
-                return f"header-{node}"
-
-            @invocation_context_check
-            def method(self, node: object, *args: object, **kw: object) -> str:
-                return f"ok-{node}-{args}-{kw}"
-
-        return Descriptor()
-
-    def test_klass_true_accepts_class(self) -> None:
-        desc = self._make_descriptor(True)
-        result = desc.method(int)
-        assert "ok-<class 'int'>" in result
-
-    def test_klass_true_rejects_instance(self) -> None:
-        desc = self._make_descriptor(True)
-        with pytest.raises(ContextFaultError):
-            desc.method(42)
-
-    def test_klass_true_rejects_none(self) -> None:
-        desc = self._make_descriptor(True)
-        with pytest.raises(ContextFaultError):
-            desc.method(None)
-
-    def test_klass_false_accepts_instance(self) -> None:
-        desc = self._make_descriptor(False)
-        result = desc.method(42)
-        assert "ok-42" in result
-
-    def test_klass_false_rejects_class(self) -> None:
-        desc = self._make_descriptor(False)
-        with pytest.raises(ContextFaultError):
-            desc.method(int)
-
-    def test_klass_false_rejects_none(self) -> None:
-        desc = self._make_descriptor(False)
-        with pytest.raises(ContextFaultError):
-            desc.method(None)
-
-    def test_klass_none_accepts_any_non_none(self) -> None:
-        desc = self._make_descriptor(None)
-        assert "ok-42" in desc.method(42)
-        assert "ok-<class 'int'>" in desc.method(int)
-        assert "ok-hello" in desc.method("hello")
-
-    def test_klass_none_accepts_none(self) -> None:
-        # When klass is None the decorator does NOT reject None;
-        # it only validates when klass is True/False.
-        desc = self._make_descriptor(None)
-        assert "ok-None" in desc.method(None)
-
-    def test_forwards_args_and_kwargs(self) -> None:
-        desc = self._make_descriptor(None)
-        result = desc.method("node", 1, 2, key="val")
-        assert "ok-node-(1, 2)-{'key': 'val'}" in result

@@ -18,7 +18,7 @@ class TestKainAll:
 
     def test_all_length(self) -> None:
         """``__all__`` should contain exactly 18 public names."""
-        assert len(kain.__all__) == 18
+        assert len(kain.__all__) == 12
 
     def test_all_has_no_duplicates(self) -> None:
         """No name should appear more than once in ``__all__``."""
@@ -28,23 +28,17 @@ class TestKainAll:
         """``__all__`` should match the known public API set."""
         expected = {
             "Is",
-            "Missing",
             "Monkey",
-            "Nothing",
             "Who",
             "add_path",
             "class_property",
-            "isis",
             "mixed_property",
-            "on_quit",
             "optional",
             "pin",
-            "quit_at",
             "required",
             "to_ascii",
             "to_bytes",
             "unique",
-            "who",
         }
         assert set(kain.__all__) == expected
 
@@ -58,35 +52,17 @@ class TestKainAll:
 class TestKainExportTypes:
     """Tests verifying the type of each public export."""
 
-    def test_missing_is_class(self) -> None:
-        """``Missing`` is a sentinel class."""
-        assert inspect.isclass(kain.Missing)
-
     def test_monkey_is_class(self) -> None:
         """``Monkey`` is a namespace class."""
         assert inspect.isclass(kain.Monkey)
-
-    def test_nothing_is_missing_instance(self) -> None:
-        """``Nothing`` is the global singleton instance of ``Missing``."""
-        assert isinstance(kain.Nothing, kain.Missing)
-        assert kain.Nothing is not kain.Missing()
 
     def test_add_path_is_function(self) -> None:
         """``add_path`` is a plain function."""
         assert isinstance(kain.add_path, types.FunctionType)
 
-    def test_on_quit_is_singleton_class(self) -> None:
-        """``on_quit`` is a class using the ``Singleton`` metaclass."""
-        assert inspect.isclass(kain.on_quit)
-        assert isinstance(kain.on_quit, Singleton)
-
     def test_optional_is_function(self) -> None:
         """``optional`` is a plain function."""
         assert isinstance(kain.optional, types.FunctionType)
-
-    def test_quit_at_is_callable(self) -> None:
-        """``quit_at`` is a callable (cached function)."""
-        assert callable(kain.quit_at)
 
     def test_required_is_function(self) -> None:
         """``required`` is a plain function."""
@@ -107,14 +83,6 @@ class TestKainExportTypes:
 
 class TestKainExportBehavior:
     """Lightweight behavioral sanity checks for exported objects."""
-
-    def test_nothing_is_falsy(self) -> None:
-        """The sentinel ``Nothing`` must be falsy."""
-        assert bool(kain.Nothing) is False
-
-    def test_missing_instance_never_equal(self) -> None:
-        """Two distinct ``Missing`` instances must not compare equal."""
-        assert kain.Missing() != kain.Missing()
 
     def test_monkey_has_expect_patch_bind_wrap(self) -> None:
         """``Monkey`` must expose its four documented classmethods."""

@@ -32,7 +32,7 @@ from functools import cached_property, wraps
 from inspect import iscoroutinefunction
 from typing import Any, Self, TypeVar, cast, overload, override
 
-from kain import isis, who
+from kain import _is, _who
 from kain.classes import Missing
 from kain.internals import get_attr
 
@@ -106,23 +106,23 @@ def extract_wrapped(obj: Any) -> Callable[..., Any]:
             descriptor types.
     """
 
-    if isis.subclass(obj, bound_property):
+    if _is.subclass(obj, bound_property):
         return obj.__get__
 
-    if isis.subclass(obj, BaseProperty):
+    if _is.subclass(obj, BaseProperty):
         return obj.call
 
-    if isis.subclass(obj, property):
+    if _is.subclass(obj, property):
         return obj.fget
 
-    if isis.subclass(obj, cached_property):
+    if _is.subclass(obj, cached_property):
         return obj.func
 
     msg = (
-        f"couldn't extract wrapped function from {who.Is(obj)}: "
+        f"couldn't extract wrapped function from {_who.Is(obj)}: "
         "replace it with @property, @cached_property, "
-        f"@{who.Is(bound_property)}, or other descriptor derived "
-        f"from {who.Is(BaseProperty)}"
+        f"@{_who.Is(bound_property)}, or other descriptor derived "
+        f"from {_who.Is(BaseProperty)}"
     )
     raise NotImplementedError(msg)
 
@@ -167,10 +167,10 @@ def parent_call(func: Callable[..., Any]) -> Callable[..., Any]:
     def parent_caller(node: Any, *args: Any, **kw: Any) -> Any:
         try:
             desc = get_attr(
-                isis.classOf(node),
+                _is.classOf(node),
                 get_name(func),
                 exclude_self=True,
-                index=get_name(func) not in isis.classOf(node).__dict__,
+                index=get_name(func) not in _is.classOf(node).__dict__,
             )
             return func(
                 node,
@@ -181,9 +181,9 @@ def parent_call(func: Callable[..., Any]) -> Callable[..., Any]:
 
         except RecursionError as e:
             msg = (
-                f"{who.Is(node)}.{get_name(func)} call real {who.Is(func)}, "
-                f"couldn't reach parent descriptor; maybe {who.Is(func)} "
-                f"it's mixin of {who.Is(node)}?"
+                f"{_who.Is(node)}.{get_name(func)} call real {_who.Is(func)}, "
+                f"couldn't reach parent descriptor; maybe {_who.Is(func)} "
+                f"it's mixin of {_who.Is(node)}?"
             )
             raise RecursionError(msg) from e
 
@@ -230,15 +230,15 @@ class BaseProperty[T_co]:
         try:
             return f"{self.title}({self.function!a})"
         except Exception:  # noqa: BLE001
-            return f"{self.title}({who.Is(self.function)})"
+            return f"{self.title}({_who.Is(self.function)})"
 
     def header_with_context(self, node: Any) -> str:
         raise NotImplementedError
 
     def footer(self, node: Any, mode: str = "undefined") -> str:
         if node is not None:
-            mode = ("instance", "class")[isis.Class(node)]
-        return f"{self.header} called with {mode} context ({who.Addr(node)})"
+            mode = ("instance", "class")[_is.Class(node)]
+        return f"{self.header} called with {mode} context ({_who.Addr(node)})"
 
     def call(self, node: Any, *args: Any, **kw: Any) -> T_co:
         raise NotImplementedError
@@ -271,7 +271,7 @@ class bound_property[T_co](BaseProperty[T_co]):
     def __init__(self, function: Callable[[Any], T_co]) -> None:
         if iscoroutinefunction(function):
             msg = (
-                f"{who.Is(function)} is coroutine function, "
+                f"{_who.Is(function)} is coroutine function, "
                 "you must use @pin.native instead of just @pin"
             )
             raise TypeError(msg)
@@ -280,7 +280,7 @@ class bound_property[T_co](BaseProperty[T_co]):
     @cached_property
     @override
     def title(self) -> str:
-        return f"instance just-replace descriptor {who.Addr(self)}"
+        return f"instance just-replace descriptor {_who.Addr(self)}"
 
     @override
     def header_with_context(self, node: Any) -> str:

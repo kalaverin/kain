@@ -25,7 +25,7 @@ from typing import (
     override,
 )
 
-from kain import isis, who
+from kain import _is, _who
 from kain.properties.cached.klass import class_parent_cached_property
 from kain.properties.primitives import ContextFaultError, parent_call
 
@@ -41,11 +41,11 @@ class cached_property[T_co](class_parent_cached_property[T_co]):
     @base_cached_property
     @override
     def title(self) -> str:
-        return f"instance data-descriptor {who.Addr(self)}".strip()
+        return f"instance data-descriptor {_who.Addr(self)}".strip()
 
     @override
     def get_node(self, node: Any) -> Any:
-        if node is None or isis.Class(node):
+        if node is None or _is.Class(node):
             msg = f"{self.header_with_context(node)}, node={node!r}"
             if node is None and (not self.klass):
                 msg = f"{msg}; looks like a non-instance invocation"

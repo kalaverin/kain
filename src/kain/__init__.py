@@ -1,5 +1,5 @@
-from kain import isis as Is  # noqa: N812
-from kain import who as Who  # noqa: N812
+from kain import _who as Who  # noqa: N812
+from kain import _is as Is  # noqa: N812
 from kain.importer import (
     add_path,
     optional,

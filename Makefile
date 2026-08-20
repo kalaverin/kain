@@ -44,7 +44,7 @@ stubs:
 	@rm src/kain/classes.pyi.bak 2>/dev/null || true
 	@rm src/kain/importer.pyi.bak 2>/dev/null || true
 	@rm src/kain/internals.pyi.bak 2>/dev/null || true
-	@rm src/kain/isis.pyi.bak 2>/dev/null || true
+	@rm src/kain/_is.pyi.bak 2>/dev/null || true
 	@rm src/kain/monkey.pyi.bak 2>/dev/null || true
 	@rm src/kain/signals.pyi.bak 2>/dev/null || true
 	@rm src/kain/who.pyi.bak 2>/dev/null || true
@@ -61,7 +61,7 @@ clean-stubs:
 	@rm src/kain/classes.pyi 2>/dev/null || true
 	@rm src/kain/importer.pyi 2>/dev/null || true
 	@rm src/kain/internals.pyi 2>/dev/null || true
-	@rm src/kain/isis.pyi 2>/dev/null || true
+	@rm src/kain/_is.pyi 2>/dev/null || true
 	@rm src/kain/monkey.pyi 2>/dev/null || true
 	@rm src/kain/signals.pyi 2>/dev/null || true
 	@rm src/kain/who.pyi 2>/dev/null || true

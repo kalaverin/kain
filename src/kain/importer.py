@@ -27,7 +27,7 @@ from os import sep
 from pathlib import Path
 from types import ModuleType
 
-from kain import who
+from kain import _who
 from kain.internals import iter_stack, to_ascii, unique
 
 __all__ = ("add_path", "optional", "required")
@@ -124,21 +124,21 @@ def get_child(path: str, parent: object, child: str) -> object:
     if not hasattr(parent, child):
         if not ismodule(parent):
             raise ImportError(
-                f"{path} (object {who.Is(parent)} hasn't attribute "
-                f"{child!a}{who.File(parent, ' in %a') or ''})",
+                f"{path} (object {_who.Is(parent)} hasn't attribute "
+                f"{child!a}{_who.File(parent, ' in %a') or ''})",
             )
 
         if not set(dir(parent)) - IGNORED_OBJECT_FIELDS:
-            chunk = f"{who.Is(parent)}.{child}"
+            chunk = f"{_who.Is(parent)}.{child}"
             raise ImportError(
                 f"{path} (from partially initialized module "
                 f"{chunk!a}, most likely due to a circular import"
-                f'{who.File(parent, " from %a") or ""}) or just not found',
+                f'{_who.File(parent, " from %a") or ""}) or just not found',
             )
 
         raise ImportError(
-            f"{path} (module {who.Is(parent)} hasn't member {child!a}"
-            f"{who.File(parent, ' in %a') or ''})",
+            f"{path} (module {_who.Is(parent)} hasn't member {child!a}"
+            f"{_who.File(parent, ' in %a') or ''})",
         )
 
     return getattr(parent, child)
@@ -166,7 +166,7 @@ def import_object(path: str | bytes) -> object:
         <function join at ...>
     """
     if not isinstance(path, str | bytes):
-        raise TypeError(f"{who.Is(path)} isn't str")
+        raise TypeError(f"{_who.Is(path)} isn't str")
 
     path = to_ascii(path)
     logger.debug(f"lookup: {path}")
@@ -177,11 +177,11 @@ def import_object(path: str | bytes) -> object:
 
     locator = str(path)
     if not sequence:
-        logger.debug(f"import path: {who.Is(something)}")
+        logger.debug(f"import path: {_who.Is(something)}")
 
     else:
         logger.debug(
-            f"split path: {who.Is(something)} (module) "
+            f"split path: {_who.Is(something)} (module) "
             f'-> {".".join(sequence)} (path)',
         )
 
@@ -356,8 +356,8 @@ def get_path(  # noqa: PLR0912
         root = Path(root)
     else:
         raise TypeError(
-            f"root={root!r} can be str | {who.Is(Path)} | None, "
-            f"not {who.Is(root)}",
+            f"root={root!r} can be str | {_who.Is(Path)} | None, "
+            f"not {_who.Is(root)}",
         )
 
     spath = str(path).strip("/")
@@ -431,7 +431,7 @@ def add_path(path: str | Path, **kw: object) -> Path:
     elif not (str(path).startswith(sep) or path == path.resolve()):
         root = get_path(path, **kw)  # type: ignore[arg-type]  # pyrefly: ignore[bad-argument-type]  # pyright: ignore[reportArgumentType]
         if not root:  # type: ignore[truthy-bool]
-            raise ValueError(f"{path=} not found, {who.Args(**kw)}")
+            raise ValueError(f"{path=} not found, {_who.Args(**kw)}")
         path = root if str(path).startswith(".") else (root / path).resolve()
 
     str_path = str(path.resolve())
