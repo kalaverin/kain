@@ -6,7 +6,6 @@ import inspect
 import types
 
 import kain
-from kain.classes import Singleton
 
 
 class TestKainAll:
@@ -17,8 +16,8 @@ class TestKainAll:
         assert isinstance(kain.__all__, tuple)
 
     def test_all_length(self) -> None:
-        """``__all__`` should contain exactly 18 public names."""
-        assert len(kain.__all__) == 12
+        """``__all__`` should contain exactly 9 public names."""
+        assert len(kain.__all__) == 9
 
     def test_all_has_no_duplicates(self) -> None:
         """No name should appear more than once in ``__all__``."""
@@ -31,10 +30,7 @@ class TestKainAll:
             "Monkey",
             "Who",
             "add_path",
-            "class_property",
-            "mixed_property",
             "optional",
-            "pin",
             "required",
             "to_ascii",
             "to_bytes",

@@ -129,7 +129,8 @@ class Monkey:
             return new
 
         old = (
-            required(cast("str", node), name) if _who.Is(node) != name else node
+            required(cast("str", node), name)
+            if _who.Is(node) != name else node
         )
 
         setattr(node, name, new)

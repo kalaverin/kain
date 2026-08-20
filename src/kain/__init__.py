@@ -1,5 +1,5 @@
-from kain import _who as Who  # noqa: N812
 from kain import _is as Is  # noqa: N812
+from kain import _who as Who  # noqa: N812
 from kain.importer import (
     add_path,
     optional,
@@ -13,21 +13,13 @@ from kain.internals import (
 from kain.monkey import (
     Monkey,
 )
-from kain.properties import (
-    class_property,
-    mixed_property,
-    pin,
-)
 
 __all__ = (
     "Is",
     "Monkey",
     "Who",
     "add_path",
-    "class_property",
-    "mixed_property",
     "optional",
-    "pin",
     "required",
     "to_ascii",
     "to_bytes",

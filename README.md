@@ -1,271 +1,173 @@
+---
+title: kain
+description: Runtime introspection, dynamic imports, and monkey-patching utilities for Python
+---
+
+[ref: #kain]
+
 # kain
 
-[![Python](https://img.shields.io/badge/python-3.12%20|%203.13-blue)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-BSD-green)](LICENSE)
+`kain` is a small Python toolbox for runtime introspection, dynamic imports, and controlled monkey-patching.
 
-> Minimalist Python utility library. Zero runtime dependencies.
+It gives you several public entry points:
 
-`kain` is a set of helper tools: introspection, descriptors, dynamic imports, monkey-patching, signal handling. Everything is built on `typing` and the standard library — no external packages.
+- `Is` — type and shape predicates.
+- `Who` — introspection helpers for names, modules, and inheritance.
+- `required`, `optional`, `add_path` — dynamic imports and `sys.path` management.
+- `Monkey` — runtime patching, binding, and exception suppression.
+- `to_ascii`, `to_bytes`, `unique` — small text and iteration helpers.
 
----
+[ref: #installation]
 
 ## Installation
 
-Via [uv](https://docs.astral.sh/uv/):
+Install with `uv`:
 
 ```bash
 uv add kain
 ```
 
----
+Or with any PEP 517-compatible tool:
 
-## Contents
+```bash
+pip install kain
+```
 
-- [Feature overview](#feature-overview)
-- [How to use](#how-to-use)
-  - [`Is` — type predicates](#is--type-predicates)
-  - [`Who` — introspection and names](#who--introspection-and-names)
-  - [`required` / `optional` — dynamic imports](#required--optional--dynamic-imports)
-  - [`class_property` / `mixed_property` — descriptors](#class_property--mixed_property--descriptors)
-  - [`pin` — cached properties](#pin--cached-properties)
-  - [`on_quit` / `quit_at` — signals](#on_quit--quit_at--signals)
-  - [Utilities](#utilities)
-- [License](#license)
+[ref: #is]
 
----
+## Type and shape checks with `Is`
 
-## Feature overview
-
-| Module | Purpose |
-|--------|---------|
-| `kain.Is` | Type predicates: `Is.Class`, `Is.callable`, `Is.collection`, `Is.mapping`, `Is.subclass`, ... |
-| `kain.Who` | Object name formatting: `Who.Name`, `Who.Addr`, `Who.Is`, `Who.Module`, `Who.Args` |
-| `kain.importer` | Dynamic imports: `required()`, `optional()`, `add_path()`, `get_path()` |
-| `kain.properties` | Descriptors: `class_property`, `mixed_property`, `pin`, cached variants |
-| `kain.signals` | Graceful shutdown: `on_quit`, `quit_at` |
-| `kain.classes` | Sentinels: `Missing`, `Nothing`, `Singleton` |
-| `kain.internals` | Utilities: `to_ascii`, `to_bytes`, `unique`, `iter_inheritance` |
-
----
-
-## How to use
-
-### `Is` — type predicates
-
-`Is` is a namespace module of predicates. All members are callables returning `bool` (or a type for `Is.classOf`).
+`Is` is a namespace of predicates for classes, collections, primitives, mappings, and more.
 
 ```python
 from kain import Is
 
-Is.Class(str)           # True
-Is.callable(print)      # True
-Is.collection([1, 2])   # True
-Is.mapping({"a": 1})    # True
-Is.primitive(42)        # True
-Is.subclass(int, object)  # True
-
-# Special
-Is.tty                  # True if stdin/stdout/stderr are TTYs
-Is.Builtin              # alias for is_from_builtin
+assert Is.Class(int) is True
+assert Is.Class(42) is False
+assert Is.collection([1, 2, 3]) is True
+assert Is.mapping({"a": 1}) is True
+assert Is.primitive(42) is True
+assert Is.subclass(42, int | str) is True
 ```
 
-### `Who` — introspection and names
+[ref: #who]
 
-`Who` builds human-readable strings for objects — fully-qualified names, memory addresses, call arguments.
+## Introspection with `Who`
+
+`Who` gives you readable names, source files, argument lists, and inheritance chains.
 
 ```python
 from kain import Who
 
-Who.Name(str)           # 'builtins.str'
-Who.Addr(str)           # 'builtins.str#7f8b2c4d1e00'  # with hex id
-Who.Is(str)             # 'builtins.str (type)'
-Who.Module(str)         # 'builtins'
+assert Who.Is(42) == "int"
+assert Who.Name(str) == "str"
+assert Who.Cast(42) == "(int)42"
+assert Who.Args(1, 2, a=3) == "'1', '2', a=3"
 
-# Call arguments
-Who.Args(1, "hello", flag=True)  # "1, 'hello', flag=True"
+class A:
+    pass
 
-# Short name
-Who.Name(str, full=False)        # 'str'
+class B(A):
+    pass
+
+assert A in Who.Inheritance(B)
+assert Who.Inheritance(B, glue=" -> ") == "__main__.A"
 ```
 
-### `required` / `optional` — dynamic imports
+[ref: #importer]
 
-Import by string name with different strictness levels.
+## Dynamic imports with `required`, `optional`, and `add_path`
+
+`required` imports by dotted path and raises on failure; `optional` returns a default instead.
+`add_path` resolves a directory or file path and appends it to `sys.path`.
 
 ```python
-from kain import required, optional
+from kain import add_path, optional, required
 
-# Strict — raises ImportError if not found
-os_path = required("os.path")
-join = required("os.path.join")
+assert required("os.path.join") is __import__("os").path.join
+assert optional("nonexistent_package_xyz") is None
+assert optional("nonexistent_package_xyz", default="fallback") == "fallback"
 
-# Optional — falls back to default if package is missing
-natsorted = optional("natsort.natsorted", default=sorted)
-# If natsort is not installed, returns built-in sorted
+# Add a directory or a file's parent directory to sys.path.
+add_path(".")
 ```
 
-Adding paths to `sys.path`:
+[ref: #monkey]
 
-```python
-from kain import add_path
+## Runtime patching with `Monkey`
 
-add_path("../src")      # Path("../src").resolve() is added to sys.path
-```
-
-### `class_property` / `mixed_property` — descriptors
-
-Analogues of `property`, but for the class (`class_property`) and both levels (`mixed_property`).
-
-```python
-from kain import class_property, mixed_property
-
-class Config:
-    _name = "default"
-
-    @class_property
-    def name(cls):
-        return cls._name
-
-    @mixed_property
-    def greet(cls_or_self):
-        who = "class" if isinstance(cls_or_self, type) else "instance"
-        return f"hello from {who}"
-
-Config.name        # 'default'
-Config().greet     # 'hello from instance'
-Config.greet       # 'hello from class'
-```
-
-### `pin` — cached properties
-
-`pin` is the unified entry point for all cached descriptors. It exposes aliases for different variants:
-
-```python
-from kain import pin
-
-class Data:
-    @pin
-    def expensive(self):
-        return sum(range(10_000_000))
-
-    @pin.cls
-    def class_level(cls):
-        return f"cache on {cls.__name__}"
-
-    @pin.any
-    def mixed(cls_or_self):
-        return "works on both"
-
-d = Data()
-d.expensive        # computed once, then read from __dict__
-Data.class_level   # cache on class
-```
-
-Under the hood, `pin` uses the `kain.properties.cached` descriptor family:
-
-| Descriptor | Cache on | Access level |
-|-----------|----------|--------------|
-| `cached_property` | instance | instance only |
-| `class_cached_property` | class | class only |
-| `mixed_cached_property` | class | class + instance |
-| `pre_cached_property` | class | instance (value stored on class) |
-| `post_cached_property` | class | instance (lazy evaluation) |
-
-All support inheritance via `with_parent`:
-
-```python
-from kain.properties import class_property
-
-class Base:
-    @class_property
-    def label(cls):
-        return "base"
-
-class Derived(Base):
-    @class_property.with_parent
-    def label(cls, parent_value):
-        return f"derived:{parent_value}"
-
-Derived.label      # 'derived:base'
-```
-
-### `proxy_to` — attribute proxying
-
-Class decorator that forwards method calls to a pivot attribute.
-
-```python
-from kain import proxy_to
-
-@proxy_to("_inner", "read", "write", "close")
-class Wrapper:
-    def __init__(self, inner):
-        self._inner = inner
-
-# Wrapper.read / Wrapper.write / Wrapper.close now proxy
-# to _inner.read / _inner.write / _inner.close
-```
-
-### `Monkey` — monkey-patch
+`Monkey` provides helpers for suppressing exceptions, attaching functions to objects, and replacing attributes while preserving the original in `Monkey.mapping`.
 
 ```python
 from kain import Monkey
 
-# Replace an attribute on a module or object
-Monkey.patch((os.path, "join"), lambda *a: "patched!")
 
-# Wrap an existing callable
-original = Monkey.wrap(len, lambda orig, x: orig(x) * 2)
-
-# Bind a new method to a class
-Monkey.bind(SomeClass, "new_method", lambda self: 42)
-
-# Decorator: suppress specified exceptions
 class Parser:
     @Monkey.expect(ValueError)
-    def parse_int(cls, s):
-        return int(s)
+    def parse(cls, text: str) -> int | None:
+        return int(text)
 
-Parser.parse_int("not-a-number")   # None, exception swallowed
+
+assert Parser.parse("not-a-number") is None
+assert Parser.parse("42") == 42
+
+node = type("Node", (), {})()
+
+
+@Monkey.bind(node)
+def greet(name: str) -> str:
+    return f"hi {name}"
+
+
+assert node.greet("world") == "hi world"
 ```
 
-### `on_quit` / `quit_at` — signals
+[ref: #text-and-unique]
 
-```python
-from kain import on_quit, quit_at
+## Text coercion and deduplication with `to_ascii`, `to_bytes`, and `unique`
 
-# Register a callback for graceful shutdown
-@on_quit().schedule
-def cleanup():
-    print("Cleaning up before exit...")
-
-# Auto-reload on file change (dev mode)
-checker = quit_at()
-while checker.sleep(2.5):
-    pass  # main loop; exits when script mtime changes
-```
-
-`on_quit` is a singleton that intercepts `SIGINT`, `SIGTERM`, `SIGQUIT`, and `atexit`. All registered callbacks are executed exactly once.
-
-### Utilities
+`to_ascii` and `to_bytes` coerce between `str` and `bytes` with an optional charset.
+`unique` yields distinct items from an iterable, optionally by a key function.
 
 ```python
 from kain import to_ascii, to_bytes, unique
 
-# Encoding / decoding with default charset
-to_bytes("hello")              # b'hello'
-to_ascii(b"hello")             # 'hello'
+assert to_ascii(b"hello") == "hello"
+assert to_bytes("hello") == b"hello"
+assert to_ascii("é".encode("utf-8"), charset="utf-8") == "é"
 
-# Unique elements with key and filtering
-items = [1, 2, 2, 3, 1]
-list(unique(items))            # [1, 2, 3]
-
-# MRO iteration with filters
-from kain.internals import iter_inheritance
-list(iter_inheritance("hello", exclude_stdlib=True))
+assert list(unique([1, 2, 2, 3, 1])) == [1, 2, 3]
+assert list(unique(["a", "A", "b"], key=str.lower)) == ["a", "b"]
 ```
 
----
+[ref: #full-example]
 
-## License
+## Full example
 
-BSD License. See [LICENSE](LICENSE).
+```python
+from kain import Is, Monkey, Who, add_path, optional, required, to_ascii, unique
+
+
+class Config:
+    @Monkey.expect(ValueError)
+    def port(cls, raw: str) -> int | None:
+        return int(raw)
+
+
+assert Config.port("8080") == 8080
+assert Config.port("oops") is None
+
+assert Is.primitive("hello") is True
+assert Who.Is(Config.port).endswith("Config.port")
+
+join = required("os.path.join")
+assert callable(join)
+
+parser = optional("nonexistent_parser", default=str)
+assert parser is str
+
+add_path(".")
+
+assert to_ascii(b"kain") == "kain"
+assert list(unique(["x", "x", "y"])) == ["x", "y"]
+```
