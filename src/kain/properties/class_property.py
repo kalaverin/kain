@@ -170,7 +170,9 @@ class mixed_property[T_co](BaseProperty[T_co]):
         instance: object | None,
         klass: type[Any] | None = None,
     ) -> T_co:
-        return self.call(instance or klass)
+        if instance is None:
+            return self.call(klass)
+        return self.call(instance)
 
     if TYPE_CHECKING:
 

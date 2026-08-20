@@ -17,8 +17,8 @@ class TestKainAll:
         assert isinstance(kain.__all__, tuple)
 
     def test_all_length(self) -> None:
-        """``__all__`` should contain exactly 16 public names."""
-        assert len(kain.__all__) == 16
+        """``__all__`` should contain exactly 18 public names."""
+        assert len(kain.__all__) == 18
 
     def test_all_has_no_duplicates(self) -> None:
         """No name should appear more than once in ``__all__``."""
@@ -33,16 +33,18 @@ class TestKainAll:
             "Nothing",
             "Who",
             "add_path",
+            "class_property",
+            "isis",
+            "mixed_property",
             "on_quit",
             "optional",
+            "pin",
             "quit_at",
             "required",
             "to_ascii",
             "to_bytes",
             "unique",
-            "class_property",
-            "mixed_property",
-            "pin",
+            "who",
         }
         assert set(kain.__all__) == expected
 

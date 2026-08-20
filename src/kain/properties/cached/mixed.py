@@ -76,7 +76,9 @@ class mixed_parent_cached_property[T_co](
 
     @override
     def __get__(self, instance: Any, klass: Any = None) -> T_co:
-        return self.call(instance or klass)
+        if instance is None:
+            return self.call(klass)
+        return self.call(instance)
 
     if TYPE_CHECKING:
 

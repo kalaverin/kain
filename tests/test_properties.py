@@ -454,11 +454,8 @@ class TestMixedProperty:
 
         assert Foo.prop == "class"
 
-    def test_falsy_instance_bug(self) -> None:
-        """mixed_property uses `instance or klass`, so falsy instances
-        receive the class instead of themselves. This behaviour is
-        depended upon by external libraries and must not change.
-        """
+    def test_falsy_instance_gets_itself(self) -> None:
+        """A falsy instance must still receive itself in the getter."""
 
         class Falsy:
             def __bool__(self) -> bool:
@@ -469,7 +466,7 @@ class TestMixedProperty:
                 return self_or_cls
 
         obj = Falsy()
-        assert obj.prop is Falsy
+        assert obj.prop is obj
 
     def test_no_caching(self) -> None:
         class Foo:

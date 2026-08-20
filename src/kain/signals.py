@@ -27,7 +27,6 @@ import signal
 import sys
 import threading
 import time
-import warnings
 from collections.abc import Callable
 from datetime import UTC, datetime
 from functools import cache
@@ -141,11 +140,11 @@ class on_quit(metaclass=Singleton):  # noqa: N801
         for hook in (*self.hooks_chain, self.original_hook):
             try:
                 hook(exc_type, exc_value, traceback)
-            except Exception as e:  # noqa: BLE001
-                warnings.warn(
-                    f"{who.Is(hook)}: {e!r}",
-                    RuntimeWarning,
-                    stacklevel=2,
+            except Exception as e:
+                logger.exception(
+                    "Exception hook %s failed",
+                    who.Is(hook),
+                    exc_info=e,
                 )
 
         self.teardown()
@@ -209,7 +208,7 @@ class on_quit(metaclass=Singleton):  # noqa: N801
         """Register a callback to be executed during teardown.
 
         Callbacks are invoked in registration order. Exceptions raised by
-        callbacks are caught and emitted as warnings; they do not prevent
+        callbacks are caught and logged at ERROR level; they do not prevent
         subsequent callbacks from running.
 
         Args:
@@ -248,11 +247,11 @@ class on_quit(metaclass=Singleton):  # noqa: N801
             for func in self.callbacks:
                 try:
                     func()
-                except BaseException as e:  # noqa: BLE001
-                    warnings.warn(
-                        f"{who.Is(func)}: {e!r}",
-                        RuntimeWarning,
-                        stacklevel=2,
+                except BaseException as e:
+                    logger.exception(
+                        "Teardown callback %s failed",
+                        who.Is(func),
+                        exc_info=e,
                     )
         finally:
             self.already_called = True

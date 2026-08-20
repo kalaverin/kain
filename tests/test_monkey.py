@@ -89,7 +89,7 @@ class TestMonkeyPatch:
             return mod
 
         with (
-            patch("kain.monkey.Is.module", return_value=True),
+            patch("kain.monkey.isis.module", return_value=True),
             patch("kain.monkey.required", side_effect=fake_required),
         ):
             result = Monkey.patch(mod, replacement)

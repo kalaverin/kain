@@ -8,7 +8,6 @@ import logging
 import signal
 import sys
 import threading
-import warnings
 from collections.abc import Generator
 from pathlib import Path
 from types import TracebackType
@@ -166,13 +165,14 @@ class TestOnQuit:
 
         assert my_hook in obj.hooks_chain
 
-    def test_on_quit_teardown_catches_callback_exception_and_warns(
+    def test_on_quit_teardown_catches_callback_exception_and_logs(
         self,
         fake: Faker,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """GIVEN a callback that raises BaseException
         WHEN teardown() runs
-        THEN a RuntimeWarning is emitted and remaining callbacks execute.
+        THEN the failure is logged at ERROR and remaining callbacks execute.
         """
         obj = on_quit()
         after = False
@@ -187,14 +187,10 @@ class TestOnQuit:
         obj.schedule(bad_callback)
         obj.schedule(good_callback)
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level("ERROR", logger="kain.signals"):
             obj.teardown()
 
-        runtime_warnings = [
-            x for x in w if issubclass(x.category, RuntimeWarning)
-        ]
-        assert len(runtime_warnings) >= 1
+        assert any(record.levelname == "ERROR" for record in caplog.records)
         assert after is True
 
     def test_on_quit_teardown_sets_already_called_even_on_failure(
@@ -209,66 +205,62 @@ class TestOnQuit:
 
         obj.schedule(lambda: (_ for _ in ()).throw(RuntimeError(fake.pystr())))
 
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            obj.teardown()
+        obj.teardown()
 
         assert obj.already_called is True
 
-    def test_on_quit_exceptions_hooks_proxy_catches_hook_exception(
+    def test_on_quit_exceptions_hooks_proxy_logs_hook_exception(
         self,
         fake: Faker,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """GIVEN a hook that raises Exception
         WHEN exceptions_hooks_proxy is called
-        THEN RuntimeWarning is emitted for that hook and teardown proceeds.
+        THEN the failure is logged at ERROR and teardown proceeds.
         """
         obj = on_quit()
+        message = fake.pystr()
 
         def bad_hook(
             _et: type[BaseException],
             _ev: BaseException,
             _tb: TracebackType | None,
         ) -> None:
-            raise RuntimeError(fake.pystr())
+            raise RuntimeError(message)
 
         obj.hooks_chain.append(bad_hook)
         # Suppress stderr noise from the original sys.__excepthook__.
         obj.original_hook = lambda *_a: None  # type: ignore[assignment][method-assign]
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            with contextlib.suppress(SystemExit):
-                obj.exceptions_hooks_proxy(
-                    RuntimeError,
-                    RuntimeError("x"),
-                    None,
-                )
+        with (
+            caplog.at_level("ERROR", logger="kain.signals"),
+            contextlib.suppress(SystemExit),
+        ):
+            obj.exceptions_hooks_proxy(
+                RuntimeError,
+                RuntimeError("x"),
+                None,
+            )
 
-        runtime_warnings = [
-            x for x in w if issubclass(x.category, RuntimeWarning)
-        ]
-        assert len(runtime_warnings) >= 1
+        assert message in caplog.text
 
-    def test_on_quit_teardown_with_none_callback_raises_type_error(
+    def test_on_quit_teardown_with_none_callback_logs_type_error(
         self,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """GIVEN None is scheduled as a callback
         WHEN teardown() attempts to call it
-        THEN TypeError is raised inside teardown (caught as warning).
+        THEN TypeError is raised inside teardown and logged at ERROR.
         """
         obj = on_quit()
         obj.callbacks.append(None)  # type: ignore[assignment][arg-type]
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level("ERROR", logger="kain.signals"):
             obj.teardown()
 
-        runtime_warnings = [
-            x for x in w if issubclass(x.category, RuntimeWarning)
-        ]
         assert any(
-            "None" in str(warning.message) for warning in runtime_warnings
+            record.levelname == "ERROR" and "None" in record.message
+            for record in caplog.records
         )
 
     def test_on_quit_teardown_with_empty_callbacks(self) -> None:
@@ -284,10 +276,11 @@ class TestOnQuit:
     def test_on_quit_teardown_continues_after_callback_system_exit(
         self,
         fake: Faker,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """GIVEN a callback that raises SystemExit
         WHEN teardown() runs
-        THEN a RuntimeWarning is emitted and remaining callbacks execute.
+        THEN the failure is logged at ERROR and remaining callbacks execute.
         """
         obj = on_quit()
         after = False
@@ -302,14 +295,10 @@ class TestOnQuit:
         obj.schedule(bad_callback)
         obj.schedule(good_callback)
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level("ERROR", logger="kain.signals"):
             obj.teardown()
 
-        runtime_warnings = [
-            x for x in w if issubclass(x.category, RuntimeWarning)
-        ]
-        assert len(runtime_warnings) >= 1
+        assert any(record.levelname == "ERROR" for record in caplog.records)
         assert after is True
 
 
@@ -691,10 +680,13 @@ class TestEdgeCases:
         assert result is False
         assert any("removed" in r.message for r in caplog.records)
 
-    def test_on_quit_teardown_with_none_callback_warns(self) -> None:
+    def test_on_quit_teardown_with_none_callback_logs(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         """GIVEN None scheduled as callback
         WHEN teardown runs
-        THEN RuntimeWarning is emitted and teardown does not raise.
+        THEN the TypeError is logged at ERROR and teardown does not raise.
         """
         # --- Arrange ---
         obj = on_quit()
@@ -703,9 +695,11 @@ class TestEdgeCases:
         obj.already_called = False
 
         # --- Act ---
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level("ERROR", logger="kain.signals"):
             obj.teardown()
 
         # --- Assert ---
-        assert any(issubclass(x.category, RuntimeWarning) for x in w)
+        assert any(
+            record.levelname == "ERROR" and "None" in record.message
+            for record in caplog.records
+        )

@@ -200,7 +200,6 @@ def is_internal(x: Any) -> bool:
         return True
 
     if module := get_module(x):
-
         if module.__name__ == "builtins":
             return True
 

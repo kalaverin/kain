@@ -451,6 +451,26 @@ class TestMixedParentCachedProperty:
         assert Foo.counter == 1
         assert "__instance_memoized__" in obj.__dict__
 
+    def test_falsy_instance_still_uses_instance_cache(self) -> None:
+        class Foo:
+            counter = 0
+
+            @mixed_parent_cached_property
+            def prop(self_or_cls: Any) -> int:
+                Foo.counter += 1
+                return 42
+
+            def __bool__(self) -> bool:
+                return False
+
+        obj = Foo()
+        assert not obj
+        assert obj.prop == 42
+        assert obj.prop == 42
+        assert Foo.counter == 1
+        assert "__instance_memoized__" in obj.__dict__
+        assert "__class_memoized__" not in Foo.__dict__
+
     def test_class_caches_on_owner(self) -> None:
         class Base:
             counter = 0

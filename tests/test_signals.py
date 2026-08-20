@@ -5,7 +5,6 @@ from __future__ import annotations
 import signal
 import sys
 import threading
-import warnings
 from functools import partial
 from types import TracebackType
 from typing import Any, Never
@@ -87,16 +86,16 @@ class TestOnSystemExit:
         inst.teardown()
         assert callback.call_count == 1
 
-    def test_teardown_catches_callback_exceptions(self) -> None:
+    def test_teardown_catches_callback_exceptions(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         callback = MagicMock(side_effect=RuntimeError("boom"))
         inst = _fresh_instance()
         inst.schedule(callback)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level("ERROR", logger="kain.signals"):
             inst.teardown()
-        assert len(w) == 1
-        assert issubclass(w[0].category, RuntimeWarning)
-        assert "boom" in str(w[0].message)
+        assert "boom" in caplog.text
 
     def test_threading_handler_skips_system_exit(self) -> None:
         inst = _fresh_instance()
@@ -365,22 +364,24 @@ class TestOnQuitTeardownExtended:
         assert inst.teardown() is None
         assert inst.already_called is True
 
-    def test_teardown_catches_baseexception_in_callback(self) -> None:
+    def test_teardown_catches_baseexception_in_callback(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         inst = _fresh_instance()
         inst.schedule(lambda: (_ for _ in ()).throw(SystemExit("die")))
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level("ERROR", logger="kain.signals"):
             inst.teardown()
-        assert len(w) == 1
-        assert issubclass(w[0].category, RuntimeWarning)
-        assert "die" in str(w[0].message)
+        assert "die" in caplog.text
 
-    def test_teardown_restores_handlers_even_if_callback_raises(self) -> None:
+    def test_teardown_restores_handlers_even_if_callback_raises(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         original_excepthook = sys.excepthook
         inst = _fresh_instance()
         inst.schedule(lambda: (_ for _ in ()).throw(RuntimeError("boom")))
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
+        with caplog.at_level("ERROR", logger="kain.signals"):
             inst.teardown()
         assert sys.excepthook is original_excepthook
 
@@ -410,7 +411,10 @@ class TestOnQuitHooksExtended:
         inst.add_hook(lambda *_: None)
         assert len(inst.hooks_chain) == 1
 
-    def test_exception_in_hook_warns_but_continues(self) -> None:
+    def test_exception_in_hook_logs_and_continues(
+        self,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
         inst = _fresh_instance()
         calls: list[str] = []
 
@@ -423,12 +427,10 @@ class TestOnQuitHooksExtended:
 
         inst.add_hook(bad_hook)
         inst.add_hook(good_hook)
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level("ERROR", logger="kain.signals"):
             inst.exceptions_hooks_proxy(RuntimeError, RuntimeError("x"), None)
         assert calls == ["bad", "good"]
-        assert len(w) == 1
-        assert "hook boom" in str(w[0].message)
+        assert "hook boom" in caplog.text
         assert inst.already_called is True
 
     def test_multiple_hooks_all_called(self) -> None:
@@ -879,17 +881,17 @@ class TestOnQuitIntegration:
         inst.teardown()
         assert calls == [0, 1, 2, 3, 4]
 
-    def test_exceptions_hooks_proxy_warns_on_original_hook_failure(
+    def test_exceptions_hooks_proxy_logs_on_original_hook_failure(
         self,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         inst = _fresh_instance()
         inst.original_hook = lambda *_: (_ for _ in ()).throw(
             RuntimeError("orig"),
         )
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        with caplog.at_level("ERROR", logger="kain.signals"):
             inst.exceptions_hooks_proxy(ValueError, ValueError("v"), None)
-        assert any("orig" in str(m.message) for m in w)
+        assert "orig" in caplog.text
 
     def test_restore_original_handlers_idempotent(self) -> None:
         inst = _fresh_instance()
