@@ -190,51 +190,6 @@ def parent_call(func: Callable[..., Any]) -> Callable[..., Any]:
     return parent_caller
 
 
-def invocation_context_check(func: Callable[..., Any]) -> Callable[..., Any]:
-    """Decorator that validates the ``node`` context before calling ``func``.
-
-    .. note::
-        This helper is defined here for symmetry with ``descriptors.py`` but
-        is **not used internally** by any class in the ``properties`` package.
-        The cached-property hierarchy performs context checks inline inside
-        ``get_node`` instead.
-
-    The wrapper inspects ``self.klass``:
-
-    * ``True``  → ``node`` must be a class.
-    * ``False`` → ``node`` must *not* be a class.
-    * ``None``  → ``node`` may be anything except ``None``.
-
-    Args:
-        func: The function to wrap.
-
-    Returns:
-        A wrapped function that validates ``node`` before calling ``func``.
-
-    Raises:
-        ContextFaultError: If the context does not match ``self.klass``.
-    """
-
-    @wraps(func)
-    def context(self: Any, node: Any, *args: Any, **kw: Any) -> Any:
-
-        if (klass := self.klass) is not None and (
-            node is None or klass != isis.Class(node)
-        ):
-            msg = (
-                f"{who.Is(func)} exception, "
-                f"{self.header_with_context(node)}, {node=}"
-            )
-            if node is None and (not klass):
-                msg = f"{msg}; looks like a non-instance invocation"
-
-            raise ContextFaultError(msg)
-
-        return func(self, node, *args, **kw)
-
-    return context
-
-
 class BaseProperty[T_co]:
     """Abstract base class shared by all ``kain`` descriptors.
 
