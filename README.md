@@ -13,8 +13,8 @@ It gives you several public entry points:
 
 - `Is` — type and shape predicates.
 - `Who` — introspection helpers for names, modules, and inheritance.
-- `required`, `optional`, `add_path` — dynamic imports and `sys.path` management.
 - `Monkey` — runtime patching, binding, and exception suppression.
+- `required`, `optional`, `add_path` — dynamic imports and `sys.path` management.
 - `to_ascii`, `to_bytes`, `unique` — small text and iteration helpers.
 
 [ref: #installation]
@@ -101,13 +101,6 @@ add_path(".")
 ```python
 from kain import Monkey
 
-
-class Parser:
-    @Monkey.expect(ValueError)
-    def parse(cls, text: str) -> int | None:
-        return int(text)
-
-
 assert Parser.parse("not-a-number") is None
 assert Parser.parse("42") == 42
 
@@ -149,13 +142,11 @@ from kain import Is, Monkey, Who, add_path, optional, required, to_ascii, unique
 
 
 class Config:
-    @Monkey.expect(ValueError)
     def port(cls, raw: str) -> int | None:
         return int(raw)
 
 
 assert Config.port("8080") == 8080
-assert Config.port("oops") is None
 
 assert Is.primitive("hello") is True
 assert Who.Is(Config.port).endswith("Config.port")

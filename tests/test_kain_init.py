@@ -80,9 +80,8 @@ class TestKainExportTypes:
 class TestKainExportBehavior:
     """Lightweight behavioral sanity checks for exported objects."""
 
-    def test_monkey_has_expect_patch_bind_wrap(self) -> None:
-        """``Monkey`` must expose its four documented classmethods."""
-        assert callable(kain.Monkey.expect)
-        assert callable(kain.Monkey.patch)
+    def test_monkey_has_patch_bind_wrap(self) -> None:
+        """``Monkey`` must expose its three documented classmethods."""
+        assert callable(kain.Monkey.replace)
         assert callable(kain.Monkey.bind)
         assert callable(kain.Monkey.wrap)

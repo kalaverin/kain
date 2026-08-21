@@ -1,146 +1,176 @@
-"""Monkey-patching utilities for modules, classes, and functions.
+from __future__ import annotations
 
-This module provides a small toolkit for runtime modification of
-existing objects:
-
-    - ``Monkey.expect`` - decorator that silences specified exceptions.
-    - ``Monkey.patch`` - replace an attribute on a module or object.
-    - ``Monkey.bind`` - attach a new function to a target object.
-    - ``Monkey.wrap`` - wrap an existing callable with custom logic.
-
-Example:
-    >>> from kain.monkey import Monkey
-    >>> import os
-    >>> original = os.path.join
-    >>> def my_join(*args):
-    ...     return "joined:" + original(*args)
-    ...
-    >>> Monkey.patch((os.path, "join"), my_join)
-    <function my_join at ...>
-    >>> Monkey.mapping[my_join] is original
-    True
-"""
-
-from collections.abc import Callable
-from contextlib import suppress
 from functools import wraps
 from logging import getLogger
-from types import ModuleType
-from typing import Any, ClassVar, cast
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Concatenate,
+    ParamSpec,
+    TypeVar,
+)
 
 from kain import _is, _who
+from kain.classes import Missing
 from kain.importer import required
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from types import ModuleType
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
+
+Nothing = Missing()
 
 logger = getLogger(__name__)
 
 
+def get_name(node: object) -> str:
+    if (
+        _is.Class(node)
+        or _is.builtin(node)
+        or _is.function(node)
+        or _is.method(node)
+        or _is.module(node)
+    ):
+        return _who.Name(node)
+
+    name = _who.Cast(node)
+    msg = "cannot derive attribute name"
+    logger.error(
+        msg,
+        extra={
+            "object": name,
+        },
+    )
+    raise AttributeError(msg)
+
+
+def get_attribute(
+    node: object,
+    name: str,
+    *,
+    by_short: bool = False,
+) -> object:
+    if (_who.Name(node) if by_short else _who.Is(node)) == name:
+        return node
+    return getattr(node, name)
+
+
+def import_from_string(node: str | object) -> object:
+    if isinstance(node, str):
+        return required(node)
+    return node
+
+
+def parse_target(
+    target: str | ModuleType | tuple[object, str] | object,
+    replacement: object | None = None,
+) -> tuple[object, str]:
+    """Normalize a patch/wrap target into ``(node, name)``.
+
+    Args:
+        target: One of:
+            - A dotted import path (e.g. ``"os.path.join"``)
+            - A module object (``name`` comes from *replacement*'s
+              short name)
+            - A ``(node, name)`` tuple
+            - An arbitrary object (``name`` comes from *replacement*'s
+              short name)
+        replacement: The replacement object. Its short name is used as a
+            fallback when *target* does not explicitly specify one.
+
+    Returns:
+        A ``(node, name)`` tuple.
+
+    Raises:
+        ImportError: If a dotted path cannot be resolved.
+        AttributeError: If *replacement* has no usable short name and
+            the target requires one.
+    """
+    if isinstance(target, tuple):
+        return target
+
+    if _is.module(target):
+        return target, get_name(replacement)
+
+    if isinstance(target, str):
+        try:
+            if "." in target:
+                parent_path, name = target.rsplit(".", 1)
+                return required(parent_path), name
+
+            return required(target), get_name(replacement)
+
+        except ImportError:
+            logger.error("target=%r import error", target)  # noqa: TRY400
+            raise
+
+    return target, get_name(replacement)
+
+
 class Monkey:
-    """Namespace for monkey-patching helpers."""
+    """Namespace for reversible runtime attribute patching utilities."""
 
     mapping: ClassVar[dict[object, object]] = {}
-    """Maps patched objects back to their original values."""
 
     @classmethod
-    def expect(
+    def replace(
         cls,
-        *exceptions: type[BaseException],
-    ) -> Callable[[Callable[..., object]], Any]:
-        """Return a decorator that suppresses the given exceptions.
-
-        The decorator is intended for classmethods: it turns the wrapped
-        function into a classmethod and silently ignores any of the
-        specified exceptions raised inside it.
-
-        Args:
-            *exceptions: Exception types to catch and suppress.
-
-        Returns:
-            A decorator that accepts a function and returns a
-            classmethod wrapper.
-
-        Example:
-            >>> class Kls:
-            ...     @Monkey.expect(ValueError)
-            ...     def parse(cls, data: str) -> int:
-            ...         return int(data)
-            ...
-            >>> Kls.parse("not-a-number")  # no exception raised
-        """
-
-        def make_wrapper(func: Callable[..., object]) -> object | None:
-            @wraps(func)
-            def wrapper(
-                klass: type[object],
-                *args: object,
-                **kw: object,
-            ) -> object:
-                with suppress(*exceptions):
-                    return func(klass, *args, **kw)
-                return None
-
-            return classmethod(wrapper)  # type: ignore[arg-type]
-
-        return make_wrapper
-
-    @classmethod
-    def patch(
-        cls,
-        module: str | ModuleType | tuple[object, str],
-        new: object,
-    ) -> object:
-        """Replace an attribute on *module* with *new*.
+        target: str | ModuleType | tuple[object, str],
+        replacement: _T,
+    ) -> _T:
+        """Replace an attribute on *target* with *replacement*.
 
         The original value is stored in :attr:`Monkey.mapping` so it can
         be restored later if needed.
 
         Args:
-            module: One of:
+            target: One of:
                 - A dotted import path (e.g. ``"os.path.join"``)
-                - A module object (``name`` is taken from ``new.__name__``)
+                - A module object (``name`` is taken from *replacement*'s
+                  short name)
                 - A ``(node, name)`` tuple pointing to the attribute
-            new: The replacement object.
+            replacement: The replacement object.
 
         Returns:
-            The object that was actually set (usually *new*).
+            The object that was actually set.
 
         Raises:
             ImportError: If the dotted path cannot be resolved.
             RuntimeError: If the old and new values are identical after
                 assignment.
         """
-        node: object
-        name: str
+        node, name = parse_target(target, replacement=replacement)
+        if getattr(node, name, Nothing) is replacement:
+            return replacement
 
-        if isinstance(module, tuple):
-            node, name = module
+        old = get_attribute(node, name)
 
-        elif _is.module(module):
-            node, name = module, cast("str", getattr(new, "__name__", ""))
+        setattr(node, name, replacement)
+        set_new = getattr(node, name)
 
-        else:
-            path, name = module.rsplit(".", 1)
-            try:
-                node = required(path)
-            except ImportError:
-                logger.error(f"{module=} import error")  # noqa: TRY400
-                raise
+        if old is set_new:
+            msg = "patch failed: old and new are identical after assignment"
+            logger.error(
+                msg,
+                extra={
+                    "target": _who.Cast(target),
+                    "replacement": _who.Cast(replacement),
+                },
+            )
+            raise RuntimeError(msg)
 
-        if getattr(node, name, None) is new:
-            return new
-
-        old = (
-            required(cast("str", node), name)
-            if _who.Is(node) != name else node
+        cls.mapping[set_new] = old
+        logger.debug(
+            "attribute replaced",
+            extra={
+                "before": _who.Addr(old),
+                "after": _who.Addr(set_new),
+            },
         )
-
-        setattr(node, name, new)
-        new = getattr(node, name)
-        if old is new:
-            raise RuntimeError
-
-        cls.mapping[new] = old
-        logger.debug(f"{_who.Addr(old)} -> {_who.Addr(new)}")
-        return new
+        return set_new
 
     @classmethod
     def bind(
@@ -148,12 +178,13 @@ class Monkey:
         node: str | object,
         name: str | None = None,
         decorator: Callable[..., object] | None = None,
-    ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+    ) -> Callable[[Callable[..., _T]], Callable[_P, _T]]:
         """Bind *func* as an attribute of *node*.
 
         Args:
             node: Target object or a dotted import path resolving to it.
-            name: Attribute name to use. Defaults to ``func.__name__``.
+            name: Attribute name to use. Defaults to the short name of
+                *func*.
             decorator: Optional decorator to apply. When this is exactly
                 :class:`classmethod`, *node* is injected as the first
                 positional argument.
@@ -166,18 +197,24 @@ class Monkey:
                 resolve it.
             AttributeError: If ``setattr`` on *node* fails.
         """
-        node = required(node) if isinstance(node, str) else node
+        target = import_from_string(node)
 
-        def bind(func: Callable[..., object]) -> Callable[..., object]:
+        def bind(func: Callable[..., _T]) -> Callable[_P, _T]:
             @wraps(func)
-            def wrapper(*args: object, **kw: object) -> object:
+            def wrapper(*args: _P.args, **kw: _P.kwargs) -> _T:
                 if decorator is classmethod:
-                    return func(node, *args, **kw)
+                    return func(target, *args, **kw)
                 return func(*args, **kw)
 
-            local = name or cast("str", getattr(func, "__name__", ""))
-            setattr(node, local, wrapper)
-            logger.info(f"{_who.Is(node)}.{local} <- {_who.Addr(func)}")
+            local_name = name or get_name(func)
+            setattr(target, local_name, wrapper)
+            logger.debug(
+                "attribute bounded with",
+                extra={
+                    "before": f"{_who.Is(target)}.{local_name}",
+                    "after": _who.Addr(func),
+                },
+            )
             return wrapper
 
         return bind
@@ -188,7 +225,10 @@ class Monkey:
         node: str | object,
         name: str | None = None,
         decorator: Callable[..., object] | None = None,
-    ) -> Callable[[Callable[..., object]], Callable[..., object]]:
+    ) -> Callable[
+        [Callable[Concatenate[object, _P], _T]],
+        Callable[_P, _T],
+    ]:
         """Wrap an existing callable on *node*.
 
         The wrapper receives the original callable as its first argument,
@@ -196,8 +236,8 @@ class Monkey:
 
         Args:
             node: Target object or a dotted import path resolving to it.
-            name: Name of the attribute to wrap. Defaults to
-                ``func.__name__``.
+            name: Name of the attribute to wrap. Defaults to the short
+                name of *func*.
             decorator: Optional decorator to apply to the wrapper before
                 patching.
 
@@ -208,23 +248,27 @@ class Monkey:
             ImportError: If *node* is a string and ``required`` fails to
                 resolve it.
         """
-        node = required(node) if isinstance(node, str) else node
 
-        def wrap(func: Callable[..., object]) -> Callable[..., object]:
-            wrapped_name = name or cast("str", getattr(func, "__name__", ""))
-            if _who.Name(node) != wrapped_name:
-                wrapped_func = required(cast("str", node), wrapped_name)
-            else:
-                wrapped_func = node
+        def wrap(
+            func: Callable[Concatenate[object, _P], _T],
+        ) -> Callable[_P, _T]:
+            wrapped_name = name or get_name(func)
+            target = import_from_string(node)
+            original = get_attribute(target, wrapped_name, by_short=True)
 
             @wraps(func)
-            def wrapper(*args: object, **kw: object) -> object:
-                return func(wrapped_func, *args, **kw)
+            def wrapper(*args: _P.args, **kw: _P.kwargs) -> _T:
+                return func(original, *args, **kw)
 
-            logger.info(f"{_who.Is(node)}.{wrapped_name} <- {_who.Addr(func)}")
-
-            wrapped = decorator(wrapper) if decorator else wrapper
-            _ = cls.patch((node, wrapped_name), wrapped)
+            logger.debug(
+                "attribute wrapped with",
+                extra={
+                    "before": f"{_who.Is(target)}.{wrapped_name}",
+                    "after": _who.Addr(func),
+                },
+            )
+            to_patch = decorator(wrapper) if decorator else wrapper
+            cls.replace((target, wrapped_name), to_patch)
             return wrapper
 
         return wrap

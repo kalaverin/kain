@@ -1,680 +1,641 @@
-"""Unit tests for monkey-patching utilities.
+"""Unit tests for the Monkey patching namespace."""
 
-Arrange-Act-Assert pattern, BDD docstrings.
-"""
+from __future__ import annotations
 
-import inspect
 import logging
 import os.path
 from collections.abc import Callable, Generator
-from typing import Any, get_type_hints
+from contextlib import contextmanager
+from types import ModuleType
 
 import pytest
 from faker import Faker
 
+from kain.importer import required
 from kain.monkey import Monkey
+
+pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)
-def _cleanup_monkey_mapping() -> Generator[None, None, None]:
-    """Clear Monkey.mapping after each test to avoid cross-test pollution."""
+def _reset_namespace_mappings() -> Generator[None]:
+    """Save and restore Monkey.mapping around each test."""
+    saved = dict(Monkey.mapping)
+    Monkey.mapping.clear()
     yield
     Monkey.mapping.clear()
+    Monkey.mapping.update(saved)
 
 
 @pytest.fixture
-def fresh_target(fake: Faker) -> object:
-    """Return a fresh object with patchable attributes."""
-
-    class Target:
-        attr1 = fake.pystr(min_chars=4, max_chars=8)
-        attr2 = fake.pystr(min_chars=4, max_chars=8)
-
-    return Target()
-
-
-# ------------------------------------------------------------------
-# Monkey.expect
-# ------------------------------------------------------------------
+def fresh_callable_target(
+    monkeypatch_target_factory: Callable[..., object],
+) -> object:
+    """Fresh object with a callable ``func`` attribute."""
+    target = monkeypatch_target_factory()
+    target.func = lambda: "original"
+    return target
 
 
-class TestMonkeyExpect:
-    """GIVEN exception types to suppress
-    WHEN a method is decorated with @Monkey.expect(...)
-    THEN specified exceptions are swallowed and classmethod is produced.
-    """
+@pytest.fixture
+def fresh_class_target() -> type:
+    """Fresh class with a classmethod ``method``."""
 
-    def test_expect_suppresses_specified_exception(self) -> None:
-        """GIVEN ValueError in the list
-        WHEN the decorated method raises ValueError
-        THEN None is returned instead of propagating.
-        """
+    class Node:
+        @classmethod
+        def method(cls) -> str:
+            return "original"
 
-        class Kls:
-            @Monkey.expect(ValueError)
-            def parse(self: type[object], data: str) -> int:
-                return int(data)
-
-        result = Kls.parse("not-a-number")
-        assert result is None
-
-    def test_expect_does_not_suppress_unspecified_exception(self) -> None:
-        """GIVEN only ValueError is expected
-        WHEN the decorated method raises TypeError
-        THEN TypeError propagates.
-        """
-
-        class Kls:
-            @Monkey.expect(ValueError)
-            def parse(self: type[object], data: str) -> int:
-                return int(data)
-
-        with pytest.raises(TypeError):
-            Kls.parse(None)  # int(None) raises TypeError
-
-    def test_expect_returns_value_on_success(self, fake: Faker) -> None:
-        """GIVEN a decorated method that succeeds
-        WHEN called with valid input
-        THEN the original return value is preserved.
-        """
-        value = fake.pyint()
-
-        class Kls:
-            @Monkey.expect(ValueError)
-            def get_it(self: type[object]) -> int:
-                return value
-
-        assert Kls.get_it() == value
-
-    def test_expect_produces_classmethod(self) -> None:
-        """GIVEN a decorated method
-        WHEN inspected via getattr_static
-        THEN it is an instance of classmethod.
-        """
-
-        class Kls:
-            @Monkey.expect(ValueError)
-            def parse(self: type[object], data: str) -> int:
-                return int(data)
-
-        assert isinstance(inspect.getattr_static(Kls, "parse"), classmethod)
-
-    def test_expect_with_no_exceptions_catches_nothing(self) -> None:
-        """GIVEN zero exception types
-        WHEN the decorated method raises ValueError
-        THEN ValueError propagates (suppress() with no args catches nothing).
-        """
-
-        class Kls:
-            @Monkey.expect()
-            def parse(self: type[object], data: str) -> int:
-                return int(data)
-
-        with pytest.raises(ValueError, match="invalid literal"):
-            Kls.parse("not-a-number")
-
-    def test_expect_with_multiple_exceptions(self) -> None:
-        """GIVEN a tuple of exception types
-        WHEN the decorated method raises any of them
-        THEN they are suppressed.
-        """
-
-        class Kls:
-            @Monkey.expect(ValueError, TypeError)
-            def parse(self: type[object], data: str) -> int:
-                raise ValueError("boom")
-
-        assert Kls.parse("x") is None
+    return Node
 
 
-# ------------------------------------------------------------------
-# Monkey.patch
-# ------------------------------------------------------------------
+def _make_join_replacement(fake: Faker) -> Callable[..., str]:
+    """Return a function named ``join`` for os.path patching."""
+
+    def replacement(*args: object, **kwargs: object) -> str:
+        return fake.pystr()
+
+    replacement.__name__ = "join"
+    replacement.__qualname__ = "join"
+    return replacement
 
 
-class TestMonkeyPatch:
-    """GIVEN a target object and a replacement value
-    WHEN Monkey.patch is called
-    THEN the attribute is replaced and the original is stored.
-    """
+def _patch_target(
+    kind: str,
+    fresh_target: object,
+) -> tuple[object, object, str, object]:
+    """Decode a patch matrix kind into (target, node, name, original)."""
+    if kind == "tuple_attr1":
+        return (
+            (fresh_target, "attr1"),
+            fresh_target,
+            "attr1",
+            fresh_target.attr1,
+        )
+    if kind == "tuple_missing_attr":
+        return (
+            (fresh_target, "missing_attr"),
+            fresh_target,
+            "missing_attr",
+            None,
+        )
+    if kind == "string_os.path.join":
+        return "os.path.join", os.path, "join", os.path.join
+    if kind == "module_os.path":
+        return os.path, os.path, "join", os.path.join
+    raise ValueError(kind)
 
-    pytestmark = pytest.mark.xfail(
-        reason="uses removed two-arg required() API",
-        strict=False,
+
+def _wrap_target(
+    kind: str,
+    fresh_target: object,
+    fresh_class_target: type,
+) -> tuple[object, str, object]:
+    """Decode a wrap matrix kind into (node, name, original)."""
+    if kind == "object_func":
+        return fresh_target, "func", fresh_target.func
+    if kind == "class_method":
+        return fresh_class_target, "method", fresh_class_target.method
+    if kind == "string_os.path_join":
+        return "os.path", "join", os.path.join
+    raise ValueError(kind)
+
+
+@contextmanager
+def _apply_patch(
+    cls: type[Monkey],
+    target: str | ModuleType | tuple[object, str],
+    new: object,
+) -> Generator[object]:
+    """Call ``cls.replace`` and restore the attribute afterwards."""
+    result = cls.replace(target, new)
+    try:
+        yield result
+    finally:
+        original = cls.mapping.pop(result, None)
+        if original is not None:
+            restored = cls.replace(target, original)
+            cls.mapping.pop(restored, None)
+
+
+@contextmanager
+def _apply_wrap(
+    cls: type[Monkey],
+    node: str | object,
+    name: str,
+    decorator: Callable[..., object] | None,
+    wrapper_func: Callable[..., object],
+) -> Generator[tuple[object, Callable[..., object]]]:
+    """Call ``cls.wrap`` and restore the attribute afterwards."""
+    if isinstance(node, str):
+        node = required(node)
+    original = getattr(node, name)
+    wrapper = cls.wrap(node, name=name, decorator=decorator)(wrapper_func)
+    set_value = getattr(node, name)
+    try:
+        yield set_value, wrapper
+    finally:
+        stored = cls.mapping.pop(set_value, None)
+        setattr(node, name, stored if stored is not None else original)
+
+
+@contextmanager
+def _apply_bind(
+    cls: type[Monkey],
+    node: str | object,
+    name: str | None,
+    decorator: Callable[..., object] | None,
+    func: Callable[..., object],
+) -> Generator[Callable[..., object]]:
+    """Call ``cls.bind`` and remove the attribute afterwards."""
+    bound_name = name or func.__name__
+    original = (
+        getattr(node, bound_name, None) if hasattr(node, bound_name) else None
     )
+    wrapper = cls.bind(node, name=name, decorator=decorator)(func)
+    try:
+        yield wrapper
+    finally:
+        if hasattr(node, bound_name):
+            delattr(node, bound_name)
+        if original is not None:
+            setattr(node, bound_name, original)
 
-    def test_patch_replaces_attribute_on_object(
-        self,
-        fresh_target: object,
-        fake: Faker,
-    ) -> None:
-        """GIVEN a fresh target object
-        WHEN an attribute is patched
-        THEN the attribute equals the new value.
-        """
-        new_value = fake.pystr()
-        original = fresh_target.attr1
 
-        Monkey.patch((fresh_target, "attr1"), new_value)
+@pytest.mark.parametrize(
+    "kind, new_kind",
+    (
+        pytest.param("tuple_attr1", "replace", id="tuple-replace"),
+        pytest.param("string_os.path.join", "replace", id="string-replace"),
+        pytest.param("module_os.path", "replace", id="module-replace"),
+        pytest.param("tuple_attr1", "same", id="tuple-short"),
+        pytest.param("string_os.path.join", "same", id="string-short"),
+        pytest.param("module_os.path", "same", id="module-short"),
+    ),
+)
+def test_patch_replacement_matrix(
+    kind: str,
+    new_kind: str,
+    monkey_target: object,
+    fake: Faker,
+) -> None:
+    """GIVEN a target form
+    WHEN Monkey.patch replaces the attribute
+    THEN the new value is set and the original is stored.
+    """
+    target, node, name, original = _patch_target(kind, monkey_target)
+    if new_kind == "replace":
+        new_value: object = (
+            _make_join_replacement(fake) if name == "join" else fake.pystr()
+        )
+    else:
+        # Identity short-circuit: patch with the current value itself.
+        new_value = original
 
-        assert fresh_target.attr1 is new_value
-        # restore
-        Monkey.mapping.pop(new_value, None)
-        fresh_target.attr1 = original
-
-    def test_patch_stores_original_in_mapping(
-        self,
-        fresh_target: object,
-        fake: Faker,
-    ) -> None:
-        """GIVEN a fresh target object
-        WHEN an attribute is patched
-        THEN Monkey.mapping[new] is the original value.
-        """
-        new_value = fake.pystr()
-        original = fresh_target.attr1
-
-        Monkey.patch((fresh_target, "attr1"), new_value)
-
-        assert Monkey.mapping[new_value] is original
-        # restore
-        Monkey.mapping.pop(new_value, None)
-        fresh_target.attr1 = original
-
-    def test_patch_logs_debug_with_addresses(
-        self,
-        fresh_target: object,
-        fake: Faker,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """GIVEN a fresh target object
-        WHEN an attribute is patched with DEBUG logging enabled
-        THEN caplog captures a DEBUG record containing '->'.
-        """
-        new_value = fake.pystr()
-        original = fresh_target.attr1
-
-        with caplog.at_level(logging.DEBUG, logger="kain.monkey"):
-            Monkey.patch((fresh_target, "attr1"), new_value)
-
-        assert any("->" in r.message for r in caplog.records)
-        # restore
-        Monkey.mapping.pop(new_value, None)
-        fresh_target.attr1 = original
-
-    def test_patch_accepts_dotted_path(self, fake: Faker) -> None:
-        """GIVEN a dotted import path
-        WHEN Monkey.patch replaces a stdlib attribute
-        THEN the attribute is replaced and can be restored.
-        """
-
-        def new_func() -> str:
-            return fake.pystr()
-
-        Monkey.patch("os.path.join", new_func)
-
-        assert os.path.join is new_func
-        # restore
-        os.path.join = Monkey.mapping.pop(new_func)
-
-    def test_patch_accepts_tuple_node_name(self, fake: Faker) -> None:
-        """GIVEN a (node, name) tuple
-        WHEN Monkey.patch is called
-        THEN the attribute is replaced.
-        """
-
-        def new_func() -> str:
-            return fake.pystr()
-
-        Monkey.patch((os.path, "join"), new_func)
-
-        assert os.path.join is new_func
-        # restore
-        os.path.join = Monkey.mapping.pop(new_func)
-
-    def test_patch_accepts_module_object(self, fake: Faker) -> None:
-        """GIVEN a module object as target
-        WHEN Monkey.patch is called with a replacement whose __name__ matches
-        THEN the attribute is replaced.
-        """
-
-        def new_func() -> str:
-            return fake.pystr()
-
-        new_func.__name__ = "join"  # type: ignore[assignment][attr-defined]
-
-        Monkey.patch(os.path, new_func)
-
-        assert os.path.join is new_func
-        # restore
-        os.path.join = Monkey.mapping.pop(new_func)
-
-    def test_patch_raises_import_error_for_invalid_path(
-        self,
-        fake: Faker,
-    ) -> None:
-        """GIVEN an invalid dotted path
-        WHEN Monkey.patch attempts resolution
-        THEN ImportError is raised.
-        """
-        with pytest.raises(ImportError):
-            Monkey.patch(
-                f"{fake.pystr(min_chars=8, max_chars=12)}.missing",
-                fake.pystr(),
-            )
-
-    @pytest.mark.xfail(
-        reason="Current implementation has an early return when "
-        "getattr(node, name, None) is new, preventing RuntimeError "
-        "from ever being reached in practice.",
-        strict=True,
-    )
-    def test_patch_raises_runtime_error_when_old_is_new(
-        self,
-        fresh_target: object,
-    ) -> None:
-        """GIVEN a replacement identical to the current attribute
-        WHEN Monkey.patch detects old is new after setattr
-        THEN RuntimeError is raised.
-
-        .. note::
-            This test documents unreachable code. The early identity
-            check ``if getattr(node, name, None) is new: return new``
-            means the later ``if old is new: raise RuntimeError``
-            can never trigger with the current object model.
-        """
-        with pytest.raises(RuntimeError):
-            Monkey.patch((fresh_target, "attr1"), fresh_target.attr1)
-
-    def test_patch_returns_new_value(
-        self,
-        fresh_target: object,
-        fake: Faker,
-    ) -> None:
-        """GIVEN a replacement value
-        WHEN Monkey.patch succeeds
-        THEN it returns the actually-set attribute.
-        """
-        new_value = fake.pystr()
-
-        result = Monkey.patch((fresh_target, "attr1"), new_value)
-
+    with _apply_patch(Monkey, target, new_value) as result:
         assert result is new_value
-        # restore
-        Monkey.mapping.pop(new_value, None)
-        fresh_target.attr1 = new_value
+        assert getattr(node, name) is new_value
+        if new_kind == "replace":
+            assert Monkey.mapping[result] is original
+        else:
+            assert new_value not in Monkey.mapping
 
 
-# ------------------------------------------------------------------
-# Monkey.bind
-# ------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "kind, expected_exc",
+    (
+        pytest.param("string_invalid", ImportError, id="invalid-string"),
+        pytest.param("tuple_missing_attr", AttributeError, id="missing-attr"),
+        pytest.param("module_no_name", AttributeError, id="module-no-name"),
+    ),
+)
+def test_patch_error_matrix(
+    kind: str,
+    expected_exc: type[BaseException],
+    monkey_target: object,
+    fake: Faker,
+) -> None:
+    """GIVEN an invalid target
+    WHEN Monkey.patch is called
+    THEN the expected exception is raised.
+    """
+    if kind == "string_invalid":
+        target: object = f"{fake.pystr(min_chars=8, max_chars=12)}.missing"
+    elif kind == "tuple_missing_attr":
+        target = (monkey_target, "missing_attr")
+    elif kind == "module_no_name":
+        target = os.path
+    else:
+        raise ValueError(kind)
+
+    new: object = fake.pystr() if kind != "module_no_name" else object()
+    with pytest.raises(expected_exc):
+        Monkey.replace(target, new)
 
 
-class TestMonkeyBind:
+@pytest.mark.parametrize(
+    "decorator_kind, name_kind",
+    (
+        pytest.param(None, None, id="bind-plain"),
+        pytest.param("classmethod", None, id="bind-classmethod"),
+        pytest.param(None, "custom", id="bind-custom-name"),
+        pytest.param("custom", None, id="bind-decorator"),
+    ),
+)
+def test_bind_attachment_matrix(
+    decorator_kind: str | None,
+    name_kind: str | None,
+    monkey_target: object,
+    fake: Faker,
+) -> None:
     """GIVEN a target object
-    WHEN Monkey.bind attaches a new function
-    THEN the function is accessible as an attribute.
+    WHEN a function is bound with optional name/decorator
+    THEN it is accessible and cleanup restores state.
     """
+    expected = fake.pystr()
+    name = "custom_name" if name_kind == "custom" else None
+    decorated: list[bool] = []
 
-    def test_bind_adds_method_to_object(
-        self,
-        fresh_target: object,
-        fake: Faker,
-    ) -> None:
-        """GIVEN a target object
-        WHEN a function is bound with no decorator
-        THEN the attribute is callable and returns the function result.
-        """
-        expected = fake.pystr()
+    decorator: Callable[..., object] | None = None
+    if decorator_kind == "classmethod":
+        decorator = classmethod
+    elif decorator_kind == "custom":
 
-        @Monkey.bind(fresh_target)
-        def greet() -> str:
+        def custom_decorator(
+            fn: Callable[..., object],
+        ) -> Callable[..., object]:
+            decorated.append(True)
+            return fn
+
+        decorator = custom_decorator
+
+    if decorator_kind == "classmethod":
+
+        def func(node: object) -> str:
             return expected
 
-        assert fresh_target.greet() == expected
-        # cleanup
-        delattr(fresh_target, "greet")
+    else:
 
-    def test_bind_with_classmethod_decorator_injects_node(
-        self,
-        fresh_target: object,
-        fake: Faker,
-    ) -> None:
-        """GIVEN decorator=classmethod
-        WHEN the bound wrapper is called
-        THEN the target object is passed as the first positional argument.
-        """
-        expected = fake.pystr()
-
-        @Monkey.bind(fresh_target, decorator=classmethod)
-        def identify(_node: object) -> str:
+        def func() -> str:
             return expected
 
-        # classmethod injection passes node as first arg
-        assert fresh_target.identify() == expected
-        delattr(fresh_target, "identify")
-
-    def test_bind_with_custom_name(
-        self,
-        fresh_target: object,
-        fake: Faker,
-    ) -> None:
-        """GIVEN a custom name override
-        WHEN the function is bound
-        THEN it is stored under the custom name.
-        """
-        expected = fake.pystr()
-
-        @Monkey.bind(fresh_target, name="custom_name")
-        def greet() -> str:
-            return expected
-
-        assert hasattr(fresh_target, "custom_name")
-        assert fresh_target.custom_name() == expected
-        delattr(fresh_target, "custom_name")
-
-    def test_bind_logs_info_with_addresses(
-        self,
-        fresh_target: object,
-        fake: Faker,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """GIVEN a target object
-        WHEN a function is bound with INFO logging enabled
-        THEN caplog captures a record containing '<-'.
-        """
-        with caplog.at_level(logging.INFO, logger="kain.monkey"):
-
-            @Monkey.bind(fresh_target)
-            def greet() -> str:
-                return fake.pystr()
-
-        assert any("<-" in r.message for r in caplog.records)
-        delattr(fresh_target, "greet")
-
-    def test_bind_raises_import_error_for_string_node(
-        self,
-        fake: Faker,
-    ) -> None:
-        """GIVEN an invalid dotted path string as node
-        WHEN Monkey.bind resolves it
-        THEN ImportError is raised.
-        """
-        with pytest.raises(ImportError):
-
-            @Monkey.bind("totally.fake.module.path")
-            def greet() -> str:
-                return fake.pystr()
-
-    def test_bind_raises_attribute_error_when_setattr_fails(
-        self,
-        fake: Faker,
-    ) -> None:
-        """GIVEN an object without __dict__ (e.g., plain object())
-        WHEN Monkey.bind attempts setattr
-        THEN AttributeError is raised.
-        """
-        with pytest.raises(AttributeError):
-
-            @Monkey.bind(object())
-            def greet() -> str:
-                return fake.pystr()
+    with _apply_bind(Monkey, monkey_target, name, decorator, func):
+        bound_name = name or func.__name__
+        assert hasattr(monkey_target, bound_name)
+        if decorator_kind == "custom":
+            # Bind does not apply arbitrary decorators; only classmethod
+            # injection is handled.
+            assert decorated == []
+        assert getattr(monkey_target, bound_name)() == expected
 
 
-# ------------------------------------------------------------------
-# Monkey.wrap
-# ------------------------------------------------------------------
-
-
-class TestMonkeyWrap:
-
-    pytestmark = pytest.mark.xfail(
-        reason="uses removed two-arg required() API",
-        strict=False,
+@pytest.mark.parametrize(
+    "kind, decorator_kind",
+    (
+        pytest.param("object_func", None, id="wrap-object"),
+        pytest.param("class_method", None, id="wrap-class"),
+        pytest.param("string_os.path_join", None, id="wrap-string"),
+        pytest.param("object_func", "custom", id="wrap-decorator"),
+    ),
+)
+def test_wrap_replacement_matrix(
+    kind: str,
+    decorator_kind: str | None,
+    fresh_callable_target: object,
+    fresh_class_target: type,
+) -> None:
+    """GIVEN a callable attribute
+    WHEN it is wrapped
+    THEN the wrapper receives the original and the attribute is restored.
+    """
+    node, name, _original = _wrap_target(
+        kind,
+        fresh_callable_target,
+        fresh_class_target,
     )
-    """GIVEN a target callable
-    WHEN Monkey.wrap creates a wrapper
-    THEN the wrapper receives the original callable as its first arg.
-    """
+    sentinel = "wrap-sentinel"
 
-    def test_wrap_passes_original_as_first_argument(
-        self,
-        fresh_target: object,
-        fake: Faker,
-    ) -> None:
-        """GIVEN a bound method on a target
-        WHEN wrapped with a function accepting (original, ...)
-        THEN the original callable is injected as the first positional arg.
-        """
-        sentinel = fake.pystr()
+    decorator: Callable[..., object] | None = None
+    if decorator_kind == "custom":
 
-        @Monkey.wrap(fresh_target, "attr1")
-        def wrapper(_orig: object) -> str:
-            return sentinel
-
-        assert fresh_target.attr1() == sentinel
-        # restore via mapping (the *patched* callable is the key)
-        old = Monkey.mapping.pop(fresh_target.attr1)
-        fresh_target.attr1 = old
-
-    def test_wrap_replaces_attribute_via_patch(
-        self,
-        fresh_target: object,
-        fake: Faker,
-    ) -> None:
-        """GIVEN a target attribute
-        WHEN Monkey.wrap is applied
-        THEN Monkey.mapping contains an entry for the wrapper.
-        """
-        sentinel = fake.pystr()
-
-        @Monkey.wrap(fresh_target, "attr1")
-        def wrapper(_orig: object) -> str:
-            return sentinel
-
-        assert fresh_target.attr1() == sentinel
-        assert fresh_target.attr1 in Monkey.mapping
-        old = Monkey.mapping.pop(fresh_target.attr1)
-        fresh_target.attr1 = old
-
-    def test_wrap_logs_info_with_addresses(
-        self,
-        fresh_target: object,
-        fake: Faker,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """GIVEN a target attribute
-        WHEN Monkey.wrap is applied with INFO logging enabled
-        THEN caplog captures a record containing '<-'.
-        """
-        with caplog.at_level(logging.INFO, logger="kain.monkey"):
-
-            @Monkey.wrap(fresh_target, "attr1")
-            def wrapper(_orig: object) -> str:
-                return fake.pystr()
-
-        assert any("<-" in r.message for r in caplog.records)
-        old = Monkey.mapping.pop(fresh_target.attr1)
-        fresh_target.attr1 = old
-
-    def test_wrap_with_decorator_applies_decorator(
-        self,
-        fresh_target: object,
-        fake: Faker,
-    ) -> None:
-        """GIVEN a decorator function
-        WHEN Monkey.wrap applies it to the wrapper before patching
-        THEN the patched attribute is the decorated wrapper.
-        """
-        sentinel = fake.pystr()
-
-        def my_dec(func: Callable[..., Any]) -> Callable[..., Any]:
-            def inner() -> str:
-                return sentinel
+        def custom_decorator(
+            fn: Callable[..., object],
+        ) -> Callable[..., object]:
+            def inner(*args: object, **kwargs: object) -> str:
+                return f"decorated:{fn(*args, **kwargs)}"
 
             return inner
 
-        @Monkey.wrap(fresh_target, "attr1", decorator=my_dec)
-        def wrapper(_orig: object) -> str:
-            return fake.pystr()
+        decorator = custom_decorator
 
-        assert fresh_target.attr1() == sentinel
-        old = Monkey.mapping.pop(fresh_target.attr1)
-        fresh_target.attr1 = old
+    def wrapper(wrapped: object, *args: object, **kwargs: object) -> str:
+        result = wrapped(*args, **kwargs) if name == "join" else wrapped()
+        return f"{sentinel}:{result}"
 
-    def test_wrap_raises_import_error_for_string_node(
-        self,
-        fake: Faker,
-    ) -> None:
-        """GIVEN an invalid dotted path string as node
-        WHEN Monkey.wrap resolves it
-        THEN ImportError is raised.
-        """
-        with pytest.raises(ImportError):
-
-            @Monkey.wrap("totally.fake.module.path", "whatever")
-            def wrapper(_orig: object) -> str:
-                return fake.pystr()
-
-
-# ------------------------------------------------------------------
-# Security tests
-# ------------------------------------------------------------------
+    with _apply_wrap(Monkey, node, name, decorator, wrapper) as (
+        set_value,
+        _wrapped,
+    ):
+        if decorator_kind == "custom":
+            assert set_value is not _wrapped
+        assert set_value in Monkey.mapping
+        if name == "method":
+            obj = fresh_class_target()
+            assert obj.method() == f"{sentinel}:original"
+        elif name == "join":
+            assert os.path.join("a") == f"{sentinel}:a"  # noqa: PTH118
+        elif decorator_kind == "custom":
+            assert node.func() == f"decorated:{sentinel}:original"
+        else:
+            assert node.func() == f"{sentinel}:original"
 
 
-@pytest.mark.unit
-@pytest.mark.security
-@pytest.mark.xfail(
-    reason="uses removed two-arg required() API",
-    strict=False,
+@pytest.mark.parametrize(
+    "node",
+    (pytest.param("totally.fake.module.path", id="wrap-invalid"),),
 )
-def test_monkey_patch_logs_do_not_contain_pii(
-    caplog: pytest.LogCaptureFixture,
+def test_wrap_error_matrix(
+    node: str,
     fake: Faker,
 ) -> None:
+    """GIVEN an invalid dotted path
+    WHEN Monkey.wrap resolves it
+    THEN ImportError is raised.
     """
-    Given: a Monkey.patch operation
-    When: DEBUG logging is captured
-    Then: no PII appears in log records.
+
+    def wrapper(wrapped: object) -> str:
+        return fake.pystr()
+
+    with pytest.raises(ImportError):
+        Monkey.wrap(node, name="whatever")(wrapper)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    (pytest.param("tuple_attr1", id="patch-log"),),
+)
+def test_patch_logs_matrix(
+    kind: str,
+    monkey_target: object,
+    fake: Faker,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """GIVEN debug logging enabled
+    WHEN Monkey.patch runs
+    THEN a structured 'attribute patched' record is emitted.
     """
-    # --- Arrange ---
+    target, _node, name, _original = _patch_target(kind, monkey_target)
+    new_value: object = (
+        _make_join_replacement(fake) if name == "join" else fake.pystr()
+    )
+    with (
+        caplog.at_level(logging.DEBUG, logger=Monkey.__module__),
+        _apply_patch(Monkey, target, new_value),
+    ):
+        pass
+
+    assert any(
+        record.message == "attribute replaced"
+        and getattr(record, "before", "") != ""
+        and getattr(record, "after", "") != ""
+        for record in caplog.records
+    )
+
+
+@pytest.mark.parametrize(
+    "cls",
+    (Monkey,),
+    ids=("monkey",),
+)
+def test_bind_logs_matrix(
+    cls: type[Monkey],
+    monkey_target: object,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """GIVEN debug logging enabled
+    WHEN Monkey.bind runs
+    THEN a structured 'attribute replaced with' record is emitted.
+    """
+
+    def func() -> str:
+        return "bound"
+
+    with (
+        caplog.at_level(logging.DEBUG, logger=cls.__module__),
+        _apply_bind(cls, monkey_target, None, None, func),
+    ):
+        pass
+
+    assert any(
+        record.message == "attribute bounded with"
+        and getattr(record, "before", "") != ""
+        and getattr(record, "after", "") != ""
+        for record in caplog.records
+    )
+
+
+@pytest.mark.parametrize(
+    "kind",
+    (pytest.param("object_func", id="wrap-log"),),
+)
+def test_wrap_logs_matrix(
+    kind: str,
+    fresh_callable_target: object,
+    fresh_class_target: type,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """GIVEN debug logging enabled
+    WHEN Monkey.wrap runs
+    THEN a structured 'attribute replaced with' record is emitted.
+    """
+    node, name, _original = _wrap_target(
+        kind,
+        fresh_callable_target,
+        fresh_class_target,
+    )
+
+    def wrapper(wrapped: object) -> str:
+        return "wrapped"
+
+    with (
+        caplog.at_level(logging.DEBUG, logger=Monkey.__module__),
+        _apply_wrap(Monkey, node, name, None, wrapper),
+    ):
+        pass
+
+    assert any(
+        record.message == "attribute wrapped with"
+        and getattr(record, "before", "") != ""
+        and getattr(record, "after", "") != ""
+        for record in caplog.records
+    )
+
+
+@pytest.mark.parametrize(
+    "cls",
+    (Monkey,),
+    ids=("monkey",),
+)
+def test_wrap_staticmethod_matrix(
+    cls: type[Monkey],
+    fake: Faker,
+) -> None:
+    """GIVEN a staticmethod
+    WHEN it is wrapped
+    THEN the wrapper receives the original callable.
+    """
+    sentinel = fake.pystr()
+
+    class Node:
+        @staticmethod
+        def static() -> str:
+            return "original"
+
+    def wrapper(wrapped: object) -> str:
+        return f"{sentinel}:{wrapped()}"
+
+    with _apply_wrap(cls, Node, "static", None, wrapper):
+        assert Node.static() == f"{sentinel}:original"
+
+
+@pytest.mark.parametrize(
+    "kind, expected_exc",
+    (
+        pytest.param("bind_object", AttributeError, id="bind-object"),
+        pytest.param("bind_int", AttributeError, id="bind-int"),
+        pytest.param("patch_object", AttributeError, id="patch-object"),
+        pytest.param("patch_built_in", TypeError, id="patch-built-in"),
+        pytest.param("patch_none", AttributeError, id="patch-none"),
+    ),
+)
+def test_patch_and_bind_error_surfaces(
+    kind: str,
+    expected_exc: type[BaseException],
+    fake: Faker,
+) -> None:
+    """GIVEN an unwritable or invalid target
+    WHEN Monkey.patch / Monkey.bind is called
+    THEN the expected exception is raised and no state leaks.
+    """
+    if kind == "bind_object":
+        target = Monkey.bind(object(), fake.pystr())
+    elif kind == "bind_int":
+        target = Monkey.bind(42, fake.pystr())
+    elif kind == "patch_object":
+        target = (object(), fake.pystr())
+    elif kind == "patch_built_in":
+        target = (str, "join")
+    elif kind == "patch_none":
+        target = (None, fake.pystr())
+    else:
+        raise ValueError(kind)
+
+    if kind.startswith("bind_"):
+        with pytest.raises(expected_exc):
+            target(lambda: None)
+    else:
+        with pytest.raises(expected_exc):
+            Monkey.replace(target, fake.pystr())
+
+    assert not Monkey.mapping
+
+
+@pytest.mark.parametrize(
+    "cls",
+    (Monkey,),
+    ids=("monkey",),
+)
+def test_wrap_property_and_descriptors(
+    cls: type[Monkey],
+    fake: Faker,
+) -> None:
+    """GIVEN a property descriptor
+    WHEN it is wrapped
+    THEN the wrapper receives the property and the instance.
+    """
+    sentinel = fake.pystr()
+
+    class Node:
+        @property
+        def value(self) -> str:
+            return "original"
+
+    def wrapper(wrapped: object, self: object) -> str:
+        return f"{sentinel}:{wrapped.__get__(self, type(self))}"
+
+    with _apply_wrap(cls, Node, "value", None, wrapper):
+        obj = Node()
+        assert obj.value() == f"{sentinel}:original"
+
+
+@pytest.mark.parametrize(
+    "kind",
+    (
+        pytest.param("patch_invalid_string", id="patch-invalid-string"),
+        pytest.param("patch_missing_attr", id="patch-missing-attr"),
+        pytest.param("wrap_missing_attr", id="wrap-missing-attr"),
+    ),
+)
+def test_partial_failure_does_not_leak_state(
+    kind: str,
+    monkey_target: object,
+    fake: Faker,
+) -> None:
+    """GIVEN an operation that fails before mutating mapping
+    WHEN the exception is raised
+    THEN Monkey.mapping stays empty.
+    """
+    if kind == "patch_invalid_string":
+        target: object = f"{fake.pystr(min_chars=8, max_chars=12)}.missing"
+    elif kind in {"patch_missing_attr", "wrap_missing_attr"}:
+        target = (monkey_target, "missing_attr")
+    else:
+        raise ValueError(kind)
+
+    def wrapper(wrapped: object) -> str:
+        return fake.pystr()
+
+    if kind == "wrap_missing_attr":
+
+        def run() -> None:
+            Monkey.wrap(target[0], name=target[1])(wrapper)
+    else:
+
+        def run() -> None:
+            Monkey.replace(target, fake.pystr())
+
+    with pytest.raises((ImportError, AttributeError)):
+        run()
+
+    assert not Monkey.mapping
+
+
+@pytest.mark.parametrize(
+    "cls",
+    (Monkey,),
+    ids=("monkey",),
+)
+def test_logs_do_not_contain_pii(
+    cls: type[Monkey],
+    fake: Faker,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """GIVEN a patch operation with PII-like data
+    WHEN logs are captured
+    THEN no PII appears in log records.
+    """
     target = type("Target", (), {"attr": fake.pystr()})()
-    new_value = fake.pystr()
+    new_value = f"{fake.email()} {fake.password()}"
 
-    # --- Act ---
-    with caplog.at_level(logging.DEBUG, logger="kain.monkey"):
-        Monkey.patch((target, "attr"), new_value)
+    with (
+        caplog.at_level(logging.DEBUG, logger=cls.__module__),
+        _apply_patch(cls, (target, "attr"), new_value),
+    ):
+        pass
 
-    # --- Assert ---
     for record in caplog.records:
         assert "@" not in record.message
         assert "password" not in record.message.lower()
         assert "token" not in record.message.lower()
-
-
-# ------------------------------------------------------------------
-# Annotation inference
-# ------------------------------------------------------------------
-
-
-class TestAnnotationInference:
-    """GIVEN Monkey classmethods
-    WHEN inspecting type hints
-    THEN signatures are callable.
-    """
-
-    def test_patch_is_callable(self) -> None:
-        """GIVEN Monkey.patch
-        WHEN checking type hints
-        THEN it is a classmethod-like callable.
-        """
-        # --- Act ---
-        hints = get_type_hints(Monkey.patch)
-
-        # --- Assert ---
-        assert "return" in hints or callable(Monkey.patch)
-
-    def test_bind_is_callable(self) -> None:
-        """GIVEN Monkey.bind
-        WHEN checking type hints
-        THEN it is a classmethod-like callable.
-        """
-        # --- Act ---
-        hints = get_type_hints(Monkey.bind)
-
-        # --- Assert ---
-        assert "return" in hints or callable(Monkey.bind)
-
-    def test_wrap_is_callable(self) -> None:
-        """GIVEN Monkey.wrap
-        WHEN checking type hints
-        THEN it is a classmethod-like callable.
-        """
-        # --- Act ---
-        hints = get_type_hints(Monkey.wrap)
-
-        # --- Assert ---
-        assert "return" in hints or callable(Monkey.wrap)
-
-
-# ------------------------------------------------------------------
-# Edge cases
-# ------------------------------------------------------------------
-
-
-class TestEdgeCases:
-
-    pytestmark = pytest.mark.xfail(
-        reason="uses removed two-arg required() API",
-        strict=False,
-    )
-    """Paranoid edge-case coverage for Monkey."""
-
-    def test_patch_on_none_node_raises_attribute_error(
-        self,
-        fake: Faker,
-    ) -> None:
-        """GIVEN None as node
-        WHEN Monkey.patch is called
-        THEN AttributeError is raised.
-        """
-        # --- Act / Assert ---
-        with pytest.raises(AttributeError):
-            Monkey.patch((None, fake.pystr()), fake.pystr())
-
-    def test_bind_on_readonly_object_raises_attribute_error(
-        self,
-        fake: Faker,
-    ) -> None:
-        """GIVEN a read-only object (e.g. int)
-        WHEN Monkey.bind is called
-        THEN AttributeError is raised.
-        """
-
-        # --- Arrange ---
-        def func() -> str:
-            return fake.pystr()
-
-        # --- Act / Assert ---
-        with pytest.raises(AttributeError):
-            Monkey.bind(42, fake.pystr())(func)
-
-    def test_expect_with_no_exceptions_suppresses_nothing(
-        self,
-        fake: Faker,
-    ) -> None:
-        """GIVEN Monkey.expect with no exceptions
-        WHEN decorated function raises any exception
-        THEN the exception propagates.
-        """
-
-        # --- Arrange ---
-        class Sample:
-            @Monkey.expect()
-            def boom(cls) -> None:
-                msg = fake.pystr()
-                raise ValueError(msg)
-
-        # --- Act / Assert ---
-        with pytest.raises(ValueError, match=r"."):
-            Sample.boom()
+        assert getattr(record, "before", "") != new_value
+        assert getattr(record, "after", "") != new_value
