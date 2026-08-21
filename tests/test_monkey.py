@@ -1,4 +1,4 @@
-"""Tests for kain.monkey module."""
+"""Tests for zx.core.monkey module."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from kain.monkey import Monkey
+from zx.core.monkey import Monkey
 
 
 @pytest.fixture(autouse=True)
@@ -61,8 +61,8 @@ class TestMonkeyPatch:
             return mod
 
         with (
-            patch("kain.monkey._is.module", return_value=True),
-            patch("kain.monkey.required", side_effect=fake_required),
+            patch("zx.core.monkey._is.module", return_value=True),
+            patch("zx.core.monkey.required", side_effect=fake_required),
         ):
             result = Monkey.replace(mod, replacement)
 
@@ -85,7 +85,7 @@ class TestMonkeyPatch:
                 return original
             return mod
 
-        with patch("kain.monkey.required", side_effect=fake_required):
+        with patch("zx.core.monkey.required", side_effect=fake_required):
             result = Monkey.replace("test_patch_mod.func", replacement)
 
         assert result is replacement
@@ -118,7 +118,7 @@ class TestMonkeyPatch:
 
     def test_patch_logs_debug(self, caplog: pytest.LogCaptureFixture) -> None:
         """Should log a debug message on successful patch."""
-        caplog.set_level(logging.DEBUG, logger="kain.monkey")
+        caplog.set_level(logging.DEBUG, logger="zx.core.monkey")
         node = types.SimpleNamespace(key="old")
         replacement = "new"
 
@@ -255,7 +255,7 @@ class TestMonkeyWrap:
 
     def test_wrap_logs_info(self, caplog: pytest.LogCaptureFixture) -> None:
         """Should log a debug message when wrapping."""
-        caplog.set_level(logging.DEBUG, logger="kain.monkey")
+        caplog.set_level(logging.DEBUG, logger="zx.core.monkey")
         node = types.SimpleNamespace()
         node.func = lambda: None
 

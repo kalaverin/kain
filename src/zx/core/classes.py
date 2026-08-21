@@ -1,7 +1,7 @@
 from threading import RLock
 from typing import Any, override
 
-from kain import _who
+from zx.core import _who
 
 __all__ = ("Missing", "Nothing", "Singleton")
 

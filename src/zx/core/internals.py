@@ -58,7 +58,15 @@ __all__ = (
 )
 
 
-def class_of(obj: Any) -> type[Any]:
+@overload
+def class_of[T](obj: type[T]) -> type[T]: ...
+
+
+@overload
+def class_of[T](obj: T) -> type[T]: ...
+
+
+def class_of[T](obj: T | type[T]) -> type[T]:
     """Return the class of *obj*.
 
     If *obj* is already a class, it is returned unchanged.
@@ -564,7 +572,7 @@ def iter_inheritance(  # noqa: PLR0913
     if not exclude_self:
         order = unique((obj, *mro), key=id)
     else:
-        order = unique(filter(lambda x: x is not obj, mro), key=id)
+        order = unique((item for item in mro if item is not obj), key=id)
 
     if reverse:
         order = iter(reversed(list(order)))

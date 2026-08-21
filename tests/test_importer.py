@@ -1,4 +1,4 @@
-"""Tests for kain.importer module."""
+"""Tests for zx.core.importer module."""
 
 import sys
 from pathlib import Path
@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from kain import importer
-from kain.importer import (
+from zx.core import importer
+from zx.core.importer import (
     IGNORED_OBJECT_FIELDS,
     PACKAGES_MAP,
     add_path,
@@ -87,14 +87,14 @@ class TestGetModule:
 
     def test_nested_module(self) -> None:
         """Should handle nested module paths."""
-        result = get_module("kain.importer")
-        assert result[0] is sys.modules["kain.importer"]
+        result = get_module("zx.core.importer")
+        assert result[0] is sys.modules["zx.core.importer"]
         assert result[1] == ()
 
     def test_nested_module_with_attribute(self) -> None:
         """Should split nested module from attribute."""
-        result = get_module("kain.importer.required")
-        assert result[0] is sys.modules["kain.importer"]
+        result = get_module("zx.core.importer.required")
+        assert result[0] is sys.modules["zx.core.importer"]
         assert result[1] == ("required",)
 
     def test_nonexistent_module_raises(self) -> None:
@@ -217,7 +217,7 @@ class TestImportObject:
 
     def test_import_class_from_module(self) -> None:
         """Should import class from module."""
-        result = import_object("kain.importer.required")
+        result = import_object("zx.core.importer.required")
         assert result is required
 
     def test_none_path_raises(self) -> None:
@@ -330,7 +330,7 @@ class TestRequired:
 
     def test_uses_cached_import_first(self) -> None:
         """Should try cached_import first."""
-        with patch("kain.importer.cached_import") as mock_cached:
+        with patch("zx.core.importer.cached_import") as mock_cached:
             mock_cached.return_value = "result"
             result = required("test.path")
             mock_cached.assert_called_once_with("test.path")
@@ -343,8 +343,8 @@ class TestRequired:
             raise TypeError("test error")
 
         with (
-            patch("kain.importer.cached_import", side_effect=side_effect),
-            patch("kain.importer.import_object") as mock_import,
+            patch("zx.core.importer.cached_import", side_effect=side_effect),
+            patch("zx.core.importer.import_object") as mock_import,
         ):
             mock_import.return_value = "result"
             result = required("os")
@@ -357,14 +357,14 @@ class TestOptional:
 
     def test_defaults_to_quiet_true(self) -> None:
         """Should default to quiet=True."""
-        with patch("kain.importer.required") as mock_required:
+        with patch("zx.core.importer.required") as mock_required:
             optional("test")
             call_kwargs = mock_required.call_args[1]
             assert call_kwargs.get("quiet") is True
 
     def test_defaults_to_throw_false(self) -> None:
         """Should default to throw=False."""
-        with patch("kain.importer.required") as mock_required:
+        with patch("zx.core.importer.required") as mock_required:
             optional("test")
             call_kwargs = mock_required.call_args[1]
             assert call_kwargs.get("throw") is False
@@ -530,7 +530,7 @@ class TestAddPath:
 
     def test_resolves_relative_path(self) -> None:
         """Should resolve relative paths."""
-        with patch("kain.importer.get_path") as mock_get_path:
+        with patch("zx.core.importer.get_path") as mock_get_path:
             mock_get_path.return_value = Path("/resolved/path")
 
             result = add_path("../some/path")
@@ -558,7 +558,7 @@ class TestAddPath:
 
     def test_add_path_raises_when_get_path_fails(self) -> None:
         """Should raise ValueError when get_path returns empty."""
-        with patch("kain.importer.get_path") as mock_get_path:
+        with patch("zx.core.importer.get_path") as mock_get_path:
             mock_get_path.return_value = None
 
             with pytest.raises(ValueError, match="not found") as exc_info:
@@ -614,7 +614,7 @@ class TestEdgeCases:
         # Patch get_module to return our mock, and ismodule to avoid __import__
         # We patch at the importer module level where ismodule is imported to
         with (
-            patch("kain.importer.get_module") as mock_get_module,
+            patch("zx.core.importer.get_module") as mock_get_module,
             patch.object(importer, "ismodule", return_value=False),
         ):
             mock_get_module.return_value = (mock_module, ("attr",))
@@ -747,10 +747,12 @@ class TestRequiredExtended:
         assert result is sys.modules["os"]
 
     def test_required_custom_loader_mock(self) -> None:
-        with patch("kain.importer.import_object") as mock_imp:
+        with patch("zx.core.importer.import_object") as mock_imp:
             mock_imp.return_value = "loaded"
             # Force cached_import to fail with TypeError so fallback is used
-            with patch("kain.importer.cached_import", side_effect=TypeError):
+            with patch(
+                "zx.core.importer.cached_import", side_effect=TypeError,
+            ):
                 result = required("custom.loader.path")
                 assert result == "loaded"
 
@@ -765,9 +767,9 @@ class TestRequiredExtended:
             mock_warning.assert_not_called()
 
     def test_required_uses_cached_import_then_falls_back(self) -> None:
-        with patch("kain.importer.cached_import") as mock_cached:
+        with patch("zx.core.importer.cached_import") as mock_cached:
             mock_cached.side_effect = TypeError("cache miss")
-            with patch("kain.importer.import_object") as mock_imp:
+            with patch("zx.core.importer.import_object") as mock_imp:
                 mock_imp.return_value = "fallback"
                 result = required("os")
                 assert result == "fallback"
@@ -800,22 +802,22 @@ class TestOptionalExtended:
         )
 
     def test_optional_defaults_quiet_true(self) -> None:
-        with patch("kain.importer.required") as mock_req:
+        with patch("zx.core.importer.required") as mock_req:
             optional("x")
             assert mock_req.call_args[1]["quiet"] is True
 
     def test_optional_defaults_throw_false(self) -> None:
-        with patch("kain.importer.required") as mock_req:
+        with patch("zx.core.importer.required") as mock_req:
             optional("x")
             assert mock_req.call_args[1]["throw"] is False
 
     def test_optional_can_override_quiet(self) -> None:
-        with patch("kain.importer.required") as mock_req:
+        with patch("zx.core.importer.required") as mock_req:
             optional("x", quiet=False)
             assert mock_req.call_args[1]["quiet"] is False
 
     def test_optional_can_override_throw(self) -> None:
-        with patch("kain.importer.required") as mock_req:
+        with patch("zx.core.importer.required") as mock_req:
             optional("x", throw=True)
             assert mock_req.call_args[1]["throw"] is True
 
@@ -862,14 +864,14 @@ class TestAddPathExtended:
                 sys.path.remove(str_path)
 
     def test_add_path_with_relative_string(self) -> None:
-        with patch("kain.importer.get_path") as mock_get_path:
+        with patch("zx.core.importer.get_path") as mock_get_path:
             mock_get_path.return_value = Path("/resolved/relative")
             with patch.object(Path, "is_dir", return_value=True):
                 result = add_path("../relative")
                 assert result == Path("/resolved/relative")
 
     def test_add_path_with_relative_path_object(self) -> None:
-        with patch("kain.importer.get_path") as mock_get_path:
+        with patch("zx.core.importer.get_path") as mock_get_path:
             mock_get_path.return_value = Path("/resolved/rel_path")
             result = add_path(Path("../rel_path"))
             assert result == Path("/resolved/rel_path")
@@ -889,13 +891,13 @@ class TestAddPathExtended:
                 sys.path.remove(str_path)
 
     def test_add_path_with_root_kwarg(self) -> None:
-        with patch("kain.importer.get_path") as mock_get_path:
+        with patch("zx.core.importer.get_path") as mock_get_path:
             mock_get_path.return_value = Path("/custom/root")
             add_path("src", root="/custom/root")
             mock_get_path.assert_called_once()
 
     def test_add_path_forwards_kwargs_to_get_path(self) -> None:
-        with patch("kain.importer.get_path") as mock_get_path:
+        with patch("zx.core.importer.get_path") as mock_get_path:
             mock_get_path.return_value = Path("/fwd")
             add_path("src", root="/fwd", custom=True)
             assert mock_get_path.call_args[1]["custom"] is True
@@ -951,8 +953,8 @@ class TestGetModuleExtended:
         "path,expected_module_name,expected_attr",
         (
             ("os", "os", ()),
-            ("kain.importer", "kain.importer", ()),
-            ("kain.importer.required", "kain.importer", ("required",)),
+            ("zx.core.importer", "zx.core.importer", ()),
+            ("zx.core.importer.required", "zx.core.importer", ("required",)),
         ),
     )
     def test_get_module_various_paths(
@@ -1146,7 +1148,7 @@ class TestErrorCases:
         for attr in IGNORED_OBJECT_FIELDS:
             if attr != "__name__":
                 setattr(mock_mod, attr, None)
-        with patch("kain.importer.get_module") as mock_get_module:
+        with patch("zx.core.importer.get_module") as mock_get_module:
             mock_get_module.return_value = (mock_mod, ("attr",))
             with (
                 patch.object(importer, "ismodule", return_value=True),
@@ -1157,9 +1159,9 @@ class TestErrorCases:
     def test_permission_error_on_import_mocked(self) -> None:
         cached_import.cache_clear()
         with (
-            patch("kain.importer.cached_import", side_effect=TypeError),
+            patch("zx.core.importer.cached_import", side_effect=TypeError),
             patch(
-                "kain.importer.import_module",
+                "zx.core.importer.import_module",
                 side_effect=PermissionError("denied"),
             ),
         ):
@@ -1169,8 +1171,7 @@ class TestErrorCases:
                 pass
             except Exception as e:  # noqa: BLE001
                 pytest.fail(
-                    f"Expected PermissionError, got"
-                    f" {type(e).__name__}: {e}",
+                    f"Expected PermissionError, got {type(e).__name__}: {e}",
                 )
 
     @pytest.mark.parametrize(
@@ -1208,7 +1209,7 @@ class TestErrorCases:
 
     def test_add_path_raises_on_unresolvable_relative(self) -> None:
         with (
-            patch("kain.importer.get_path", return_value=None),
+            patch("zx.core.importer.get_path", return_value=None),
             pytest.raises(ValueError, match="not found"),
         ):
             add_path("unresolvable/relative")

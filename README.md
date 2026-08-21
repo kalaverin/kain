@@ -40,7 +40,7 @@ pip install kain
 `Is` is a namespace of predicates for classes, collections, primitives, mappings, and more.
 
 ```python
-from kain import Is
+from zx.core import Is
 
 assert Is.Class(int) is True
 assert Is.Class(42) is False
@@ -57,7 +57,7 @@ assert Is.subclass(42, int | str) is True
 `Who` gives you readable names, source files, argument lists, and inheritance chains.
 
 ```python
-from kain import Who
+from zx.core import Who
 
 assert Who.Is(42) == "int"
 assert Who.Name(str) == "str"
@@ -82,7 +82,7 @@ assert Who.Inheritance(B, glue=" -> ") == "__main__.A"
 `add_path` resolves a directory or file path and appends it to `sys.path`.
 
 ```python
-from kain import add_path, optional, required
+from zx.core import add_path, optional, required
 
 assert required("os.path.join") is __import__("os").path.join
 assert optional("nonexistent_package_xyz") is None
@@ -99,7 +99,7 @@ add_path(".")
 `Monkey` provides helpers for suppressing exceptions, attaching functions to objects, and replacing attributes while preserving the original in `Monkey.mapping`.
 
 ```python
-from kain import Monkey
+from zx.core import Monkey
 
 assert Parser.parse("not-a-number") is None
 assert Parser.parse("42") == 42
@@ -123,7 +123,7 @@ assert node.greet("world") == "hi world"
 `unique` yields distinct items from an iterable, optionally by a key function.
 
 ```python
-from kain import to_ascii, to_bytes, unique
+from zx.core import to_ascii, to_bytes, unique
 
 assert to_ascii(b"hello") == "hello"
 assert to_bytes("hello") == b"hello"
@@ -138,7 +138,7 @@ assert list(unique(["a", "A", "b"], key=str.lower)) == ["a", "b"]
 ## Full example
 
 ```python
-from kain import Is, Monkey, Who, add_path, optional, required, to_ascii, unique
+from zx.core import Is, Monkey, Who, add_path, optional, required, to_ascii, unique
 
 
 class Config:

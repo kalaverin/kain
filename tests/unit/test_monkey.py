@@ -11,8 +11,8 @@ from types import ModuleType
 import pytest
 from faker import Faker
 
-from kain.importer import required
-from kain.monkey import Monkey
+from zx.core.importer import required
+from zx.core.monkey import Monkey
 
 pytestmark = [pytest.mark.unit]
 

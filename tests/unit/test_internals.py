@@ -5,8 +5,8 @@ from typing import Any, Literal, Union, get_type_hints
 import pytest
 from faker import Faker
 
-from kain import Is, Who
-from kain.internals import (
+from zx.core import Is, Who
+from zx.core.internals import (
     get_attr,
     get_mro,
     get_owner,
@@ -766,7 +766,7 @@ def test_iter_stack_extracts_filename() -> None:
 
 
 class TestAnnotationInference:
-    """GIVEN kain.internals functions
+    """GIVEN zx.core.internals functions
     WHEN inspecting type hints
     THEN signatures match declared types.
     """

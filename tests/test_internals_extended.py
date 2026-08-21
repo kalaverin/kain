@@ -1,4 +1,4 @@
-"""Extended tests for kain.internals with focus on typing variants.
+"""Extended tests for zx.core.internals with focus on typing variants.
 
 These tests exercise edge cases, typing constructs, and parameter
 combinations not fully covered by the base test suite.
@@ -30,7 +30,7 @@ from typing import (
 
 import pytest
 
-from kain.internals import (
+from zx.core.internals import (
     class_of,
     format_args_and_keywords,
     get_attr,

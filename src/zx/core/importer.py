@@ -1,4 +1,4 @@
-"""Dynamic import utilities and path management for kain.
+"""Dynamic import utilities and path management for zx.core.
 
 This module provides utilities for:
 - Dynamic importing of modules, classes, functions, and attributes
@@ -11,7 +11,7 @@ The main functions are:
     - add_path(): Add resolved paths to ``sys.path``
 
 Example:
-    >>> from kain.importer import required, optional, add_path
+    >>> from zx.core.importer import required, optional, add_path
     >>> os_path = required('os.path')
     >>> natsort = optional('natsort.natsorted', default=sorted)
     >>> add_path('..')  # Add parent directory to sys.path
@@ -27,8 +27,8 @@ from os import sep
 from pathlib import Path
 from types import ModuleType
 
-from kain import _who
-from kain.internals import iter_stack, to_ascii, unique
+from zx.core import _who
+from zx.core.internals import iter_stack, to_ascii, unique
 
 __all__ = ("add_path", "optional", "required")
 
@@ -78,8 +78,8 @@ def get_module(path: str) -> tuple[ModuleType, tuple[str, ...]]:
     Example:
         >>> get_module("os.path.join")
         (<module 'posixpath' ...>, ('join',))
-        >>> get_module("kain.importer")
-        (<module 'kain.importer' ...>, ())
+        >>> get_module("zx.core.importer")
+        (<module 'zx.core.importer' ...>, ())
     """
     chunks = path.split(".")
     count = len(chunks) + 1
@@ -148,8 +148,8 @@ def import_object(path: str | bytes) -> object:
     """Dynamically import an object by its fully-qualified name.
 
     Supports importing:
-    - Entire modules (``os``, ``kain.importer``)
-    - Module attributes (``os.path.join``, ``kain.importer.required``)
+    - Entire modules (``os``, ``zx.core.importer``)
+    - Module attributes (``os.path.join``, ``zx.core.importer.required``)
 
     Args:
         path: A dotted import path as string or bytes.
@@ -257,7 +257,6 @@ def required(
             return import_object(path)
 
     except ImportError as e:
-
         if not quiet or throw:
             msg = f"couldn't import required({path=})"
 
@@ -344,7 +343,6 @@ def get_path(  # noqa: PLR0912
         ValueError: If the path cannot be resolved.
     """
     if root is None:
-
         base = Path(__file__).stem
         file = ""
         for file in iter_stack(1, offset=1):
@@ -385,7 +383,6 @@ def get_path(  # noqa: PLR0912
 
     subdir = str(root)
     while subdir != sep:
-
         future = Path(subdir)
         subdir = str(future.parent)
 

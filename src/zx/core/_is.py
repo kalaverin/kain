@@ -12,7 +12,7 @@ from inspect import (
 )
 from typing import Any
 
-from kain.internals import (
+from zx.core.internals import (
     class_of,
     is_collection,
     is_from_builtin,

@@ -4,7 +4,7 @@ from collections.abc import (
 from functools import partial
 from typing import Any
 
-from kain.internals import (
+from zx.core.internals import (
     format_args_and_keywords,
     get_mro,
     just_value,

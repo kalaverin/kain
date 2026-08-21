@@ -1,4 +1,4 @@
-"""Static type assertions for kain.internals.unique.
+"""Static type assertions for zx.core.internals.unique.
 
 Run ``basedpyright tests/test_unique_types.py`` or
 ``basedmypy tests/test_unique_types.py`` to verify.
@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, assert_type
 
-from kain.internals import unique
+from zx.core.internals import unique
 
 
 def test_type_inference_dummy() -> None:

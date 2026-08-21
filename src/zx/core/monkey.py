@@ -10,9 +10,9 @@ from typing import (
     TypeVar,
 )
 
-from kain import _is, _who
-from kain.classes import Missing
-from kain.importer import required
+from zx.core import _is, _who
+from zx.core.classes import Missing
+from zx.core.importer import required
 
 if TYPE_CHECKING:
     from collections.abc import Callable

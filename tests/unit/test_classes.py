@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, get_type_hints
 
 import pytest
 
-from kain.classes import Missing, Nothing, Singleton
+from zx.core.classes import Missing, Nothing, Singleton
 
 if TYPE_CHECKING:
     from faker import Faker

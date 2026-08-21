@@ -12,7 +12,7 @@ from typing import get_type_hints
 import pytest
 from faker import Faker
 
-from kain.importer import (
+from zx.core.importer import (
     add_path,
     cached_import,
     get_child,
@@ -303,7 +303,7 @@ def test_required_logs_warning_on_failure_when_quiet_false(
 
     # --- Act ---
     with (
-        caplog.at_level(logging.WARNING, logger="kain.importer"),
+        caplog.at_level(logging.WARNING, logger="zx.core.importer"),
         suppress(ImportError),
     ):
         required(invalid_path, quiet=False)
@@ -327,7 +327,7 @@ def test_required_does_not_log_when_quiet_true(
 
     # --- Act ---
     with (
-        caplog.at_level(logging.WARNING, logger="kain.importer"),
+        caplog.at_level(logging.WARNING, logger="zx.core.importer"),
         suppress(ImportError),
     ):
         required(invalid_path, quiet=True)
@@ -367,7 +367,7 @@ def test_required_suggests_package_when_base_not_in_sys_modules(
     """
     # --- Act / Assert ---
     with (
-        caplog.at_level(logging.WARNING, logger="kain.importer"),
+        caplog.at_level(logging.WARNING, logger="zx.core.importer"),
         pytest.raises(ImportError, match="need extra package"),
     ):
         required("magic.parser", quiet=False)
@@ -422,7 +422,7 @@ def test_optional_does_not_log_by_default(
     invalid_path = f"{fake.pystr()}.{fake.pystr()}"
 
     # --- Act ---
-    with caplog.at_level(logging.WARNING, logger="kain.importer"):
+    with caplog.at_level(logging.WARNING, logger="zx.core.importer"):
         optional(invalid_path)
 
     # --- Assert ---
@@ -706,7 +706,7 @@ def test_required_logs_do_not_contain_pii(
 
     # --- Act ---
     with (
-        caplog.at_level(logging.WARNING, logger="kain.importer"),
+        caplog.at_level(logging.WARNING, logger="zx.core.importer"),
         suppress(ImportError),
     ):
         required(invalid, throw=True)

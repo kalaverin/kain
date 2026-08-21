@@ -1,4 +1,4 @@
-"""Tests for kain.internals module."""
+"""Tests for zx.core.internals module."""
 
 from __future__ import annotations
 
@@ -25,8 +25,8 @@ from typing import (
 
 import pytest
 
-from kain import Is, Who
-from kain.internals import (
+from zx.core import Is, Who
+from zx.core.internals import (
     Builtins,
     Collections,
     Primitives,

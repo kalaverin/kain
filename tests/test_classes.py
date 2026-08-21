@@ -1,4 +1,4 @@
-"""Tests for kain.classes module."""
+"""Tests for zx.core.classes module."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Self
 
 import pytest
 
-from kain.classes import Missing, Nothing, Singleton
+from zx.core.classes import Missing, Nothing, Singleton
 
 
 class TestMissing:
@@ -251,7 +251,7 @@ class TestNothing:
 
     def test_singleton_identity(self) -> None:
         """Nothing should always be the same object."""
-        from kain.classes import Nothing as Nothing2
+        from zx.core.classes import Nothing as Nothing2
 
         assert Nothing is Nothing2
 
