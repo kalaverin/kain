@@ -545,7 +545,7 @@ def iter_stack(*args: Any, **kw: Any) -> Iterator[Any]:
     yield from (map(itemgetter(*args), result) if args else result)
 
 
-def iter_inheritance(  # noqa: PLR0913
+def iter_inheritance(  # noqa: PLR0913,PLR0917
     obj: Any,
     include: Any = None,
     exclude: Any = None,
