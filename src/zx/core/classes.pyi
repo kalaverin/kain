@@ -1,6 +1,8 @@
-from typing import Any, override
+from typing import Any, TypeVar, override
 
 __all__ = ("Missing", "Nothing", "Singleton")
+
+_SingletonInstance = TypeVar("_SingletonInstance")
 
 class Missing:
     @override
@@ -20,6 +22,10 @@ class Singleton(type):
         attributes: dict[str, object],
     ) -> None: ...
     @override
-    def __call__(cls, *args: object, **kw: object) -> object: ...
+    def __call__(
+        cls: type[_SingletonInstance],
+        *args: object,
+        **kw: object,
+    ) -> _SingletonInstance: ...
 
 Nothing: Missing

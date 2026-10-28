@@ -1,9 +1,12 @@
 from threading import RLock
-from typing import Any, override
+from typing import Any, TypeVar, cast, override
 
 from zx.core import _who
 
 __all__ = ("Missing", "Nothing", "Singleton")
+
+
+_SingletonInstance = TypeVar("_SingletonInstance")
 
 
 class Missing:
@@ -51,11 +54,16 @@ class Singleton(type):
         super().__init__(name, bases, attributes)
 
     @override
-    def __call__(cls, *args: object, **kw: object) -> object:
+    def __call__(
+        cls: type[_SingletonInstance],
+        *args: object,
+        **kw: object,
+    ) -> _SingletonInstance:
         """Return the cached instance, creating it if necessary."""
 
-        if cls.instance is Nothing:
-            with cls._lock:
-                if cls.instance is Nothing:
-                    cls.instance = super().__call__(*args, **kw)
-        return cls.instance
+        singleton = cast("Singleton", cls)
+        if singleton.instance is Nothing:
+            with singleton._lock:
+                if singleton.instance is Nothing:
+                    singleton.instance = super().__call__(*args, **kw)
+        return cast("_SingletonInstance", singleton.instance)
