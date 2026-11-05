@@ -61,6 +61,15 @@ from zx.core.internals import (
 )
 
 
+# Union introspection changed across interpreters (typing/types
+# unification landed at different points in 3.14.x and 3.15); derive the
+# expectations at runtime instead of pinning version numbers.
+UNION_MODULE = UnionType.__module__
+UNION_QUALNAME = f"{UnionType.__module__}.{UnionType.__qualname__}"
+OPTIONAL_QUALNAME = (
+    UNION_QUALNAME if type(Optional[int]) is UnionType else "typing.Optional"
+)
+
 class TestClassOf:
     def test_class_of_instance(self) -> None:
         assert class_of(42) is int
@@ -1691,11 +1700,11 @@ class TestGetModuleEdgeCases:
 
     def test_get_module_typing(self) -> None:
         assert get_module(Any).__name__ == "typing"
-        assert get_module(UnionType).__name__ == "types"
+        assert get_module(UnionType).__name__ == UNION_MODULE
 
     def test_get_module_name_typing(self) -> None:
         assert get_module_name(Any) == "typing"
-        assert get_module_name(UnionType) == "types"
+        assert get_module_name(UnionType) == UNION_MODULE
 
     def test_get_module_builtin(self) -> None:
         assert get_module(1).__name__ == "builtins"

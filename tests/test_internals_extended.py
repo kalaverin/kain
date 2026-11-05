@@ -62,6 +62,15 @@ from zx.core.internals import (
 )
 
 
+# Union introspection changed across interpreters (typing/types
+# unification landed at different points in 3.14.x and 3.15); derive the
+# expectations at runtime instead of pinning version numbers.
+UNION_MODULE = UnionType.__module__
+UNION_QUALNAME = f"{UnionType.__module__}.{UnionType.__qualname__}"
+OPTIONAL_QUALNAME = (
+    UNION_QUALNAME if type(Optional[int]) is UnionType else "typing.Optional"
+)
+
 class TestClassOfTypingVariants:
     """Runtime type-shape checks for ``class_of``."""
 
@@ -319,11 +328,11 @@ class TestGetModuleAndNameTypingVariants:
 
     def test_get_module_typing_specials(self) -> None:
         assert get_module(Any).__name__ == "typing"
-        assert get_module(UnionType).__name__ == "types"
+        assert get_module(UnionType).__name__ == UNION_MODULE
 
     def test_get_module_name_typing_specials(self) -> None:
         assert get_module_name(Any) == "typing"
-        assert get_module_name(UnionType) == "types"
+        assert get_module_name(UnionType) == UNION_MODULE
 
     def test_get_module_none_for_weird(self) -> None:
         class NoModule:
@@ -343,7 +352,7 @@ class TestObjectNameTypingVariants:
         "obj, full, expected_tail",
         (
             (Any, True, "typing.Any"),
-            (UnionType, True, "types.UnionType"),
+            (UnionType, True, UNION_QUALNAME),
             (list[int], True, "list"),
             (Literal[1], True, "typing.Literal"),
             (TypeVar("T"), False, "T"),
@@ -1177,7 +1186,7 @@ class TestTypingIntrospectionAdvanced:
 
     def test_who_is_union_type(self) -> None:
         result = who_is(int | str)
-        assert result == "types.UnionType"
+        assert result == UNION_QUALNAME
 
     def test_who_is_generic_alias(self) -> None:
         result = who_is(list[int])
@@ -1225,7 +1234,7 @@ class TestWhoIsAdvancedTyping:
         "obj, expected",
         (
             (Any, "typing.Any"),
-            (UnionType, "types.UnionType"),
+            (UnionType, UNION_QUALNAME),
             (list[int], "list"),
             (Literal[1], "typing.Literal"),
             (Protocol, "typing.Protocol"),
@@ -1245,7 +1254,7 @@ class TestObjectNameAdvancedTyping:
         "obj, full, expected",
         (
             (Any, True, "typing.Any"),
-            (UnionType, True, "types.UnionType"),
+            (UnionType, True, UNION_QUALNAME),
             (list[int], True, "list"),
             (Literal[1], True, "typing.Literal"),
             (TypeVar("T"), False, "T"),
@@ -1265,11 +1274,11 @@ class TestObjectNameAdvancedTyping:
 
     def test_object_name_union_pipe(self) -> None:
         alias = int | str
-        assert object_name(alias) == "types.UnionType"
+        assert object_name(alias) == UNION_QUALNAME
 
     def test_object_name_optional(self) -> None:
         alias = Optional[int]  # noqa: UP045
-        assert object_name(alias) == "typing.Optional"
+        assert object_name(alias) == OPTIONAL_QUALNAME
 
 
 class TestIsCollectionAdvanced:

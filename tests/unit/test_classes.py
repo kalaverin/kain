@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, get_type_hints
 
 import pytest
 
+from zx.core.classes import _SingletonInstance
 from zx.core.classes import Missing, Nothing, Singleton
 
 if TYPE_CHECKING:
@@ -308,7 +309,7 @@ class TestAnnotationInference:
         hints = get_type_hints(Singleton.__call__)
 
         # --- Assert ---
-        assert hints["return"] is object
+        assert hints["return"] is _SingletonInstance
 
 
 # ------------------------------------------------------------------
